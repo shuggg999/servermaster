@@ -1,12 +1,13 @@
 #!/bin/bash
 
+# 确保从终端读取输入
+[ -t 0 ] || exec </dev/tty
+
+trap "echo -e '\n\033[1;31m用户中断退出...\033[0m'; exit 1" SIGINT
+
 while true; do
-    clear  # 清空屏幕
-    echo -e "\033[1;36m"  # 设置青色文字
-    echo "=============================="
-    echo "      多功能命令行工具        "
-    echo "=============================="
-    echo -e "\033[0m"  # 重置颜色
+    clear
+    echo -e "\033[1;36m==============================\n      多功能命令行工具\n==============================\033[0m"
     echo "1) 显示系统信息"
     echo "2) 列出大文件（前10）"
     echo "3) 检查磁盘空间"
@@ -17,12 +18,16 @@ while true; do
     echo "8) 生成随机密码"
     echo "0) 退出"
     echo "=============================="
-    read -p "请输入选项数字: " choice
+    read -p "请输入选项数字: " choice </dev/tty
 
-    case $choice in
+    case "$choice" in
         1)
             echo -e "\n\033[1;32m系统信息：\033[0m"
-            neofetch || echo "需要安装 neofetch (sudo apt install neofetch)"
+            if command -v neofetch &>/dev/null; then
+                neofetch
+            else
+                echo "需要安装 neofetch (执行: sudo apt install neofetch)"
+            fi
             ;;
         2)
             echo -e "\n\033[1;32m当前目录大文件TOP10：\033[0m"
@@ -38,7 +43,7 @@ while true; do
             ;;
         5)
             echo -e "\n\033[1;32m活跃网络连接：\033[0m"
-            netstat -tulpn
+            ss -tulpn || netstat -tulpn
             ;;
         6)
             echo -e "\n\033[1;33m开始系统更新...\033[0m"
@@ -60,8 +65,6 @@ while true; do
             echo -e "\n\033[1;31m无效输入，请重新选择！\033[0m"
             ;;
     esac
-    
-    # 等待用户确认
-    echo -e "\n按回车键继续..."
-    read
+
+    read -p "按回车键继续..." </dev/tty
 done
