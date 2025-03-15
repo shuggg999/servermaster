@@ -56,40 +56,38 @@ system_init() {
     sleep 0.3
 }
 
-# 增强的模块下载函数
 download_module() {
     local module_path="$1"
     local local_path="$MODULES_DIR/$module_path"
     local module_url="$MODULES_REPO/$module_path"
     
-	# 检查网络连接
-	if ! ping -c 1 github.com &>/dev/null && ! ping -c 1 8.8.8.8 &>/dev/null; then
-		echo -e "${RED}网络连接失败，无法下载模块${NC}"
-		return 1
-	fi  # 使用 fi 结束 if 语句
-    
     # 创建目录
     mkdir -p "$(dirname "$local_path")"
     
-    echo -e "${CYAN}正在下载模块 $module_path...${NC}"
+    echo -e "${CYAN}正在下载模块 $module_path... (URL: $module_url)${NC}"
     
-    # 显示下载进度
-    curl -# -o "$local_path" "$module_url" || wget -q --show-progress -O "$local_path" "$module_url"
-    
-    if [ -s "$local_path" ]; then  # 检查文件是否不为空
-        # 验证文件完整性
-        if grep -q "#!/bin/bash" "$local_path"; then
-            chmod +x "$local_path"
-            echo -e "${GREEN}模块下载完成${NC}"
-            return 0
+    # 使用curl下载并指定输出路径
+    if curl -s -o "$local_path" "$module_url"; then
+        if [ -s "$local_path" ]; then  # 检查文件是否不为空
+            # 验证文件内容
+            if grep -q "#!/bin/bash" "$local_path"; then
+                chmod +x "$local_path"
+                echo -e "${GREEN}模块下载完成${NC}"
+                return 0
+            else
+                echo -e "${RED}模块下载不完整或格式错误${NC}"
+                echo "文件内容预览:"
+                head -5 "$local_path"
+                rm -f "$local_path"
+                return 1
+            fi
         else
-            echo -e "${RED}模块下载不完整或格式错误${NC}"
+            echo -e "${RED}模块下载失败: 文件为空${NC}"
             rm -f "$local_path"
             return 1
         fi
     else
-        echo -e "${RED}模块下载失败: $module_path${NC}"
-        rm -f "$local_path"
+        echo -e "${RED}模块下载失败: 无法连接到 $module_url${NC}"
         return 1
     fi
 }
