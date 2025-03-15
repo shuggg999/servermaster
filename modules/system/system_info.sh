@@ -30,6 +30,7 @@ get_ip_address() {
     fi
 }
 
+
 # Function to get system information
 get_system_info() {
     # Get CPU information
