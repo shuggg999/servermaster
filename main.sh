@@ -62,11 +62,11 @@ download_module() {
     local local_path="$MODULES_DIR/$module_path"
     local module_url="$MODULES_REPO/$module_path"
     
-    # 检查网络连接
-    if ! ping -c 1 github.com &>/dev/null && ! ping -c 1 8.8.8.8 &>/dev/null; then
-        echo -e "${RED}网络连接失败，无法下载模块${NC}"
-        return 1
-    }
+	# 检查网络连接
+	if ! ping -c 1 github.com &>/dev/null && ! ping -c 1 8.8.8.8 &>/dev/null; then
+		echo -e "${RED}网络连接失败，无法下载模块${NC}"
+		return 1
+	fi  # 使用 fi 结束 if 语句
     
     # 创建目录
     mkdir -p "$(dirname "$local_path")"
