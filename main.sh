@@ -83,7 +83,6 @@ download_module() {
 }
 
 # 执行模块
-# 执行模块 - 直接从网络加载到内存执行
 execute_module() {
     local module_path="$1"
     local module_url="$MODULES_REPO/$module_path"
@@ -94,24 +93,39 @@ execute_module() {
     export GREEN BRIGHT_GREEN CYAN BLUE MAGENTA YELLOW RED WHITE GRAY BLACK_BG BOLD DIM BLINK NC
     export MODULES_DIR MODULES_REPO
     
-    # 直接从URL下载并执行
-    local module_content=$(curl -s "$module_url")
-    
-    # 检查是否成功获取内容
-    if [[ "$module_content" == *"404: Not Found"* || -z "$module_content" ]]; then
-        echo -e "${RED}模块加载失败: $module_path${NC}"
-        return 1
+    # 如果是系统信息查询模块，使用特殊处理
+    if [[ "$module_path" == "system/system_info.sh" ]]; then
+        # 直接从URL下载并保存到临时文件
+        local temp_file="/tmp/system_info.sh"
+        curl -s "$module_url" > "$temp_file"
+        chmod +x "$temp_file"
+        
+        # 在当前shell中执行(使用source命令)，而不是创建新的进程
+        source "$temp_file"
+        
+        # 清理临时文件
+        rm -f "$temp_file"
+        return 0
+    else
+        # 其他模块使用原来的处理方式
+        local module_content=$(curl -s "$module_url")
+        
+        # 检查是否成功获取内容
+        if [[ "$module_content" == *"404: Not Found"* || -z "$module_content" ]]; then
+            echo -e "${RED}模块加载失败: $module_path${NC}"
+            return 1
+        fi
+        
+        # 检查第一行是否为正确的shebang
+        if ! echo "$module_content" | head -1 | grep -q "#!/bin/bash"; then
+            echo -e "${RED}模块格式错误: $module_path${NC}"
+            return 1
+        fi
+        
+        # 使用bash执行从内存中获取的代码
+        echo "$module_content" | bash
+        return $?
     fi
-    
-    # 检查第一行是否为正确的shebang
-    if ! echo "$module_content" | head -1 | grep -q "#!/bin/bash"; then
-        echo -e "${RED}模块格式错误: $module_path${NC}"
-        return 1
-    fi
-    
-    # 使用bash执行从内存中获取的代码
-    echo "$module_content" | bash
-    return $?
 }
 
 # 显示LOGO
