@@ -89,21 +89,34 @@ download_module() {
 }
 
 # 执行模块
+# 执行模块 - 直接从网络加载到内存执行
 execute_module() {
     local module_path="$1"
-    local local_path="$MODULES_DIR/$module_path"
+    local module_url="$MODULES_REPO/$module_path"
     
-    # 检查模块是否存在，不存在则下载
-    if [ ! -f "$local_path" ] || [ ! -s "$local_path" ]; then
-        download_module "$module_path" || return 1
-    fi
+    echo -e "${CYAN}正在加载模块 $module_path...${NC}"
     
     # 导出颜色变量给模块使用
     export GREEN BRIGHT_GREEN CYAN BLUE MAGENTA YELLOW RED WHITE GRAY BLACK_BG BOLD DIM BLINK NC
     export MODULES_DIR MODULES_REPO
     
-    # 执行模块
-    bash "$local_path"
+    # 直接从URL下载并执行
+    local module_content=$(curl -s "$module_url")
+    
+    # 检查是否成功获取内容
+    if [[ "$module_content" == *"404: Not Found"* || -z "$module_content" ]]; then
+        echo -e "${RED}模块加载失败: $module_path${NC}"
+        return 1
+    fi
+    
+    # 检查第一行是否为正确的shebang
+    if ! echo "$module_content" | head -1 | grep -q "#!/bin/bash"; then
+        echo -e "${RED}模块格式错误: $module_path${NC}"
+        return 1
+    fi
+    
+    # 使用bash执行从内存中获取的代码
+    echo "$module_content" | bash
     return $?
 }
 
