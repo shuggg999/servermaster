@@ -21,9 +21,9 @@ BLINK='\033[5m'             # 闪烁
 NC='\033[0m'                # 无颜色（重置）
 
 # 脚本版本和配置
-VERSION="5.0"
+VERSION="1.0"
 MODULES_DIR="$HOME/.servermaster/modules"
-MODULES_REPO="https://raw.githubusercontent.com/username/servermaster/main/modules"
+MODULES_REPO="https://raw.githubusercontent.com/shugggg/servermaster/main/modules"
 
 # 创建模块目录
 mkdir -p "$MODULES_DIR"
