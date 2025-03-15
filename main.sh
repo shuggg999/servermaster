@@ -64,28 +64,22 @@ download_module() {
     # 创建目录
     mkdir -p "$(dirname "$local_path")"
     
-    echo -e "${CYAN}正在下载模块 $module_path... (URL: $module_url)${NC}"
+    echo "正在下载模块: $module_path"
+    echo "从: $module_url"
+    echo "到: $local_path"
     
-    # 使用curl下载并检查HTTP状态码
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$local_path" "$module_url")
-    
-    if [ "$HTTP_CODE" == "200" ]; then
-        if [ -s "$local_path" ] && grep -q "#!/bin/bash" "$local_path"; then
-            chmod +x "$local_path"
-            echo -e "${GREEN}模块下载完成${NC}"
-            return 0
-        else
-            echo -e "${RED}模块下载不完整或格式错误${NC}"
-            echo "文件内容预览:"
-            head -5 "$local_path"
-            rm -f "$local_path"
+    # 使用wget代替curl下载模块
+    if ! wget -O "$local_path" "$module_url"; then
+        echo "下载失败! 尝试使用镜像站..."
+        if ! wget -O "$local_path" "https://mirror.ghproxy.com/$module_url"; then
+            echo "镜像站也下载失败! 请检查网络连接。"
             return 1
         fi
-    else
-        echo -e "${RED}模块下载失败: HTTP错误 $HTTP_CODE${NC}"
-        rm -f "$local_path"  # 删除可能包含错误内容的文件
-        return 1
     fi
+    
+    chmod +x "$local_path"
+    echo "模块下载成功!"
+    return 0
 }
 
 # 执行模块
