@@ -66,28 +66,24 @@ download_module() {
     
     echo -e "${CYAN}正在下载模块 $module_path... (URL: $module_url)${NC}"
     
-    # 使用curl下载并指定输出路径
-    if curl -s -o "$local_path" "$module_url"; then
-        if [ -s "$local_path" ]; then  # 检查文件是否不为空
-            # 验证文件内容
-            if grep -q "#!/bin/bash" "$local_path"; then
-                chmod +x "$local_path"
-                echo -e "${GREEN}模块下载完成${NC}"
-                return 0
-            else
-                echo -e "${RED}模块下载不完整或格式错误${NC}"
-                echo "文件内容预览:"
-                head -5 "$local_path"
-                rm -f "$local_path"
-                return 1
-            fi
+    # 使用curl下载并检查HTTP状态码
+    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$local_path" "$module_url")
+    
+    if [ "$HTTP_CODE" == "200" ]; then
+        if [ -s "$local_path" ] && grep -q "#!/bin/bash" "$local_path"; then
+            chmod +x "$local_path"
+            echo -e "${GREEN}模块下载完成${NC}"
+            return 0
         else
-            echo -e "${RED}模块下载失败: 文件为空${NC}"
+            echo -e "${RED}模块下载不完整或格式错误${NC}"
+            echo "文件内容预览:"
+            head -5 "$local_path"
             rm -f "$local_path"
             return 1
         fi
     else
-        echo -e "${RED}模块下载失败: 无法连接到 $module_url${NC}"
+        echo -e "${RED}模块下载失败: HTTP错误 $HTTP_CODE${NC}"
+        rm -f "$local_path"  # 删除可能包含错误内容的文件
         return 1
     fi
 }
