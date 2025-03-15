@@ -1,0 +1,29 @@
+name: Build Modules Package
+
+on:
+  push:
+    paths:
+      - 'modules/**'
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Create modules tarball
+        run: |
+          tar -czvf modules.tar.gz modules/
+      
+      - name: Update modules.tar.gz in repository
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'actions@github.com'
+          git add modules.tar.gz
+          git commit -m "自动更新: modules.tar.gz" || echo "无变更需要提交"
+          git push
