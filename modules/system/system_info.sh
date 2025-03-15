@@ -125,5 +125,5 @@ get_system_info
 
 # Wait for user input before returning
 echo -e "${YELLOW}按回车键返回上一级菜单...${NC}"
-read
-exit 0
+read -n 1 -s -r
+# 不要使用exit命令，让脚本自然执行完毕
