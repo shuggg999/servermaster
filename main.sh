@@ -56,29 +56,42 @@ system_init() {
     sleep 0.3
 }
 
-# 模块下载函数
+# 增强的模块下载函数
 download_module() {
     local module_path="$1"
     local local_path="$MODULES_DIR/$module_path"
     local module_url="$MODULES_REPO/$module_path"
+    
+    # 检查网络连接
+    if ! ping -c 1 github.com &>/dev/null && ! ping -c 1 8.8.8.8 &>/dev/null; then
+        echo -e "${RED}网络连接失败，无法下载模块${NC}"
+        return 1
+    }
     
     # 创建目录
     mkdir -p "$(dirname "$local_path")"
     
     echo -e "${CYAN}正在下载模块 $module_path...${NC}"
     
-    # 尝试下载模块
-    if curl -s -o "$local_path" "$module_url" || wget -q -O "$local_path" "$module_url"; then
-        if [ -s "$local_path" ]; then  # 检查文件是否不为空
+    # 显示下载进度
+    curl -# -o "$local_path" "$module_url" || wget -q --show-progress -O "$local_path" "$module_url"
+    
+    if [ -s "$local_path" ]; then  # 检查文件是否不为空
+        # 验证文件完整性
+        if grep -q "#!/bin/bash" "$local_path"; then
             chmod +x "$local_path"
             echo -e "${GREEN}模块下载完成${NC}"
             return 0
+        else
+            echo -e "${RED}模块下载不完整或格式错误${NC}"
+            rm -f "$local_path"
+            return 1
         fi
+    else
+        echo -e "${RED}模块下载失败: $module_path${NC}"
+        rm -f "$local_path"
+        return 1
     fi
-    
-    echo -e "${RED}模块下载失败: $module_path${NC}"
-    sleep 2
-    return 1
 }
 
 # 执行模块
@@ -223,13 +236,56 @@ process_main_menu() {
     esac
 }
 
-# 更新脚本
+# 改进的更新脚本功能
 update_script() {
     echo -e "${CYAN}正在检查脚本更新...${NC}"
-    # 这里添加检查和更新主脚本的逻辑
+    
+    # 获取当前版本和最新版本
+    local current_version="$VERSION"
+    local latest_version=$(curl -s "$MODULES_REPO/version.txt" || echo "unknown")
+    
+    if [ "$latest_version" = "unknown" ]; then
+        echo -e "${RED}无法检查最新版本，请检查网络连接${NC}"
+        sleep 2
+        return 1
+    fi
+    
+    echo -e "当前版本: ${YELLOW}$current_version${NC}"
+    echo -e "最新版本: ${GREEN}$latest_version${NC}"
+    
+    # 比较版本
+    if [ "$current_version" != "$latest_version" ]; then
+        echo -e "${YELLOW}发现新版本！是否更新？(y/n)${NC}"
+        read -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${CYAN}正在更新...${NC}"
+            
+            # 下载新版本脚本
+            local temp_file="/tmp/servermaster_update.sh"
+            if curl -s -o "$temp_file" "$MODULES_REPO/main.sh" || wget -q -O "$temp_file" "$MODULES_REPO/main.sh"; then
+                if [ -s "$temp_file" ]; then
+                    chmod +x "$temp_file"
+                    # 备份当前脚本
+                    cp "$0" "${0}.backup"
+                    # 替换脚本
+                    cp "$temp_file" "$0"
+                    rm -f "$temp_file"
+                    echo -e "${GREEN}更新成功！正在重启脚本...${NC}"
+                    sleep 1
+                    exec "$0"
+                    exit 0
+                fi
+            fi
+            echo -e "${RED}更新失败！${NC}"
+        else
+            echo -e "${YELLOW}已取消更新${NC}"
+        fi
+    else
+        echo -e "${GREEN}脚本已是最新版本！${NC}"
+    fi
+    
     sleep 2
-    echo -e "${GREEN}脚本已是最新版本！${NC}"
-    sleep 1
     show_main_menu
 }
 
