@@ -125,4 +125,4 @@ get_system_info
 
 # Wait for user input before returning
 echo -e "${YELLOW}按回车键返回上一级菜单...${NC}"
-read -n 1 -s -r
+read
