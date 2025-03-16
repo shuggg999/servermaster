@@ -313,11 +313,72 @@ show_installation_steps() {
     sleep 1
 }
 
+# 检查是否已安装并比较版本
+check_installed_version() {
+    if [ -f "$INSTALL_DIR/version.txt" ]; then
+        local installed_version=$(cat "$INSTALL_DIR/version.txt")
+        
+        # 获取最新版本号
+        local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
+                              curl -s "$GITHUB_RAW/version.txt" || 
+                              curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
+                              echo "$VERSION")
+        
+        echo -e "    ${CYAN}   - 检查版本信息...${NC}"
+        echo -e "    ${CYAN}   - 已安装版本: ${YELLOW}$installed_version${NC}"
+        echo -e "    ${CYAN}   - 最新版本: ${GREEN}$latest_version${NC}"
+        
+        if [ "$installed_version" != "$latest_version" ]; then
+            echo -e "    ${YELLOW}!${NC} 发现新版本! 是否更新? (y/n)"
+            read -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo -e "    ${CYAN}   - 准备更新系统...${NC}"
+                # 备份配置
+                if [ -d "$CONFIG_DIR" ]; then
+                    echo -e "    ${CYAN}   - 备份配置文件...${NC}"
+                    cp -r "$CONFIG_DIR" "/tmp/servermaster_config_backup"
+                fi
+                
+                # 删除旧文件
+                echo -e "    ${CYAN}   - 删除旧文件...${NC}"
+                rm -rf "$INSTALL_DIR"
+                
+                # 继续安装流程，会下载最新版本
+                return 0
+            else
+                echo -e "    ${CYAN}   - 继续使用当前版本...${NC}"
+                exec "$INSTALL_DIR/main.sh"
+                exit 0
+            fi
+        else
+            echo -e "    ${GREEN}✓${NC} 已是最新版本!"
+            echo -e "    ${CYAN}   - 是否重新安装? (y/n)${NC}"
+            read -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # 删除旧文件
+                echo -e "    ${CYAN}   - 删除旧文件...${NC}"
+                rm -rf "$INSTALL_DIR"
+                return 0
+            else
+                echo -e "    ${CYAN}   - 启动已安装的系统...${NC}"
+                exec "$INSTALL_DIR/main.sh"
+                exit 0
+            fi
+        fi
+    fi
+    
+    # 未安装或用户选择重新安装
+    return 0
+}
+
 # Main installation process
 main() {
     show_banner
     show_installation_steps
     check_system
+    check_installed_version
     create_directories
     check_connectivity
     download_main_script

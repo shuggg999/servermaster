@@ -134,6 +134,11 @@ download_module() {
 check_updates() {
     echo -e "${CYAN}正在检查更新...${NC}"
     
+    # 读取本地版本号
+    if [ -f "$BASE_DIR/version.txt" ]; then
+        VERSION=$(cat "$BASE_DIR/version.txt")
+    fi
+    
     # Get the latest version number (尝试三个源)
     local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
                           curl -s "$GITHUB_RAW/version.txt" || 
@@ -154,7 +159,7 @@ check_updates() {
         read -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            update_system
+            update_system "$latest_version"
         fi
     else
         echo -e "${GREEN}系统已是最新版本!${NC}"
@@ -164,27 +169,66 @@ check_updates() {
 
 # Function to update the system
 update_system() {
+    local latest_version="$1"
     echo -e "${CYAN}正在更新系统...${NC}"
     
-    # 尝试三个源下载更新脚本
-    if curl -s -o "$TEMP_DIR/update.sh" "$CF_PROXY_URL/update.sh" || 
-       curl -s -o "$TEMP_DIR/update.sh" "$GITHUB_RAW/update.sh" || 
-       curl -s -o "$TEMP_DIR/update.sh" "${MIRROR_URL}${GITHUB_RAW}/update.sh"; then
-        chmod +x "$TEMP_DIR/update.sh"
+    # 备份配置
+    echo -e "${CYAN}备份配置文件...${NC}"
+    if [ -d "$CONFIG_DIR" ]; then
+        cp -r "$CONFIG_DIR" "$TEMP_DIR/config_backup"
+    fi
+    
+    # 下载新版本的主脚本
+    echo -e "${CYAN}下载新版本主脚本...${NC}"
+    if curl -s -o "$TEMP_DIR/main.sh.new" "$CF_PROXY_URL/main.sh" || 
+       curl -s -o "$TEMP_DIR/main.sh.new" "$GITHUB_RAW/main.sh" || 
+       curl -s -o "$TEMP_DIR/main.sh.new" "${MIRROR_URL}${GITHUB_RAW}/main.sh"; then
         
-        # Execute the update script
-        bash "$TEMP_DIR/update.sh"
+        # 下载新版本的模块包
+        echo -e "${CYAN}下载新版本模块包...${NC}"
+        local modules_url="$CF_PROXY_URL/modules.tar.gz"
+        local modules_file="$TEMP_DIR/modules.tar.gz.new"
         
-        # Check if update was successful
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}更新成功! 请重新启动系统.${NC}"
+        if curl -s -o "$modules_file" "$modules_url" || 
+           curl -s -o "$modules_file" "$GITHUB_RAW/modules.tar.gz" || 
+           curl -s -o "$modules_file" "${MIRROR_URL}${GITHUB_RAW}/modules.tar.gz"; then
+            
+            # 备份当前主脚本
+            cp "$BASE_DIR/main.sh" "$TEMP_DIR/main.sh.bak"
+            
+            # 替换主脚本
+            cp "$TEMP_DIR/main.sh.new" "$BASE_DIR/main.sh"
+            chmod +x "$BASE_DIR/main.sh"
+            
+            # 清空模块目录
+            find "$MODULES_DIR" -type f -delete
+            
+            # 解压新模块
+            tar -xzf "$modules_file" -C "$BASE_DIR"
+            
+            # 恢复配置
+            if [ -d "$TEMP_DIR/config_backup" ]; then
+                cp -r "$TEMP_DIR/config_backup"/* "$CONFIG_DIR/"
+            fi
+            
+            # 更新版本号
+            echo "$latest_version" > "$BASE_DIR/version.txt"
+            
+            echo -e "${GREEN}更新成功! 新版本: $latest_version${NC}"
+            echo -e "${CYAN}正在重启系统...${NC}"
+            sleep 2
+            exec "$BASE_DIR/main.sh"
             exit 0
         else
-            echo -e "${RED}更新失败!${NC}"
+            echo -e "${RED}下载模块包失败!${NC}"
+            # 恢复备份
+            if [ -f "$TEMP_DIR/main.sh.bak" ]; then
+                cp "$TEMP_DIR/main.sh.bak" "$BASE_DIR/main.sh"
+            fi
             return 1
         fi
     else
-        echo -e "${RED}无法下载更新脚本!${NC}"
+        echo -e "${RED}下载主脚本失败!${NC}"
         return 1
     fi
 }
