@@ -154,6 +154,7 @@ check_updates() {
         return 1
     fi
     
+    
     echo -e "当前版本: ${YELLOW}$VERSION${NC}"
     echo -e "最新版本: ${GREEN}$latest_version${NC}"
     
