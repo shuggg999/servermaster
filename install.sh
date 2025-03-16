@@ -17,8 +17,8 @@ NC='\033[0m'
 
 # Script version and URLs
 VERSION="1.0"
-GITHUB_REPO="https://github.com/servermaster/servermaster"
-GITHUB_RAW="https://raw.githubusercontent.com/servermaster/servermaster/main"
+GITHUB_REPO="https://github.com/shuggg999/servermaster"
+GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main
 MIRROR_URL="https://mirror.ghproxy.com/"
 
 # Installation paths
