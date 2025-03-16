@@ -23,103 +23,153 @@ if [ -z "$GREEN" ]; then
     HIDDEN='\033[8m'
 fi
 
-# Function to get IP address information
-get_ip_address() {
-    ipv4_address=$(curl -s ipinfo.io/ip || curl -s ifconfig.me || curl -s icanhazip.com)
-    ipv6_address=$(curl -s --max-time 1 ipv6.icanhazip.com || echo "Not available")
-    
-    echo -e "${CYAN}IPv4 地址:${NC} ${WHITE}$ipv4_address${NC}"
-    if [ "$ipv6_address" != "Not available" ]; then
-        echo -e "${CYAN}IPv6 地址:${NC} ${WHITE}$ipv6_address${NC}"
-    else
-        echo -e "${CYAN}IPv6 地址:${NC} ${GRAY}不可用${NC}"
-    fi
+# 打印单行信息的函数：label 和 value
+print_info() {
+    local label="$1"
+    local value="$2"
+    # 设置固定宽度，确保右侧边框对齐
+    printf "${BLUE}║${NC} ${CYAN}%-15s${NC} ${WHITE}%-50s${NC} ${BLUE}║${NC}\n" "$label:" "$value"
 }
 
-# Function to get system information
+# Function to get IP address information
+get_ip_address() {
+    # 尝试从多个服务获取公网IPv4地址
+    local ipv4=""
+    local ipv4_sources=(
+        "https://api.ipify.org"
+        "https://ipv4.icanhazip.com"
+        "https://v4.ident.me"
+    )
+    
+    for source in "${ipv4_sources[@]}"; do
+        ipv4=$(curl -s --connect-timeout 3 "$source" 2>/dev/null)
+        if [ $? -eq 0 ] && [ -n "$ipv4" ]; then
+            break
+        fi
+    done
+    
+    # 尝试从多个服务获取公网IPv6地址
+    local ipv6=""
+    local ipv6_sources=(
+        "https://api6.ipify.org"
+        "https://ipv6.icanhazip.com"
+        "https://v6.ident.me"
+    )
+    
+    for source in "${ipv6_sources[@]}"; do
+        ipv6=$(curl -s --connect-timeout 3 "$source" 2>/dev/null)
+        if [ $? -eq 0 ] && [ -n "$ipv6" ]; then
+            break
+        fi
+    done
+    
+    # 获取本地IP地址
+    local local_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v "127.0.0.1" | head -n 1)
+    
+    # 显示IP地址信息
+    print_info "公网IPv4" "${ipv4:-未检测到}"
+    print_info "公网IPv6" "${ipv6:-未检测到}"
+    print_info "本地IPv4" "${local_ip:-未检测到}"
+}
+
+# 获取系统信息
 get_system_info() {
-    # Get CPU information
-    cpu_info=$(lscpu | awk -F': +' '/Model name:/ {print $2; exit}')
-    cpu_cores=$(nproc)
-    cpu_freq=$(lscpu | grep "CPU MHz" | awk '{printf "%.2f GHz", $3/1000}')
-    cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
-
-    # Get memory information
-    mem_info=$(free -m | awk 'NR==2{printf "%.2f/%.2fGB (%.2f%%)", $3/1024, $2/1024, $3*100/$2}')
-    swap_info=$(free -m | awk 'NR==3{used=$3; total=$2; if (total == 0) {percentage=0} else {percentage=used*100/total}; printf "%.2fGB/%.2fGB (%.0f%%)", used/1024, total/1024, percentage}')
-
-    # Get disk information
-    disk_info=$(df -h | awk '$NF=="/"{printf "%s/%s (%s)", $3, $2, $5}')
-
-    # Get load average
-    load_avg=$(uptime | awk -F'load average: ' '{print $2}')
-
-    # Get uptime
-    uptime_info=$(uptime -p)
-    uptime_info=${uptime_info:3} # Remove "up " prefix
-
-    # Get OS information
-    os_info=$(grep PRETTY_NAME /etc/os-release | cut -d '=' -f2 | tr -d '"')
-
-    # Get kernel information
-    kernel_version=$(uname -r)
-
-    # Networking information
-    dns_info=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
-    netstat_installed=$(command -v netstat > /dev/null && echo "yes" || echo "no")
+    # 获取主机名
+    local hostname=$(hostname)
+    print_info "主机名" "$hostname"
     
-    if [ "$netstat_installed" = "yes" ]; then
-        connection_count=$(netstat -an | wc -l)
-        established_connections=$(netstat -an | grep ESTABLISHED | wc -l)
-    else
-        connection_count="未安装 netstat"
-        established_connections="未安装 netstat"
-    fi
-
-    # Get hostname
-    hostname=$(hostname)
-
-    # Display system information
-    echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${CYAN}系统信息${NC}                                         ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}主机名:${NC}         ${WHITE}$hostname${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}操作系统:${NC}       ${WHITE}$os_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}内核版本:${NC}       ${WHITE}$kernel_version${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}运行时间:${NC}       ${WHITE}$uptime_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}负载情况:${NC}       ${WHITE}$load_avg${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${MAGENTA}硬件信息${NC}                                         ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}CPU型号:${NC}        ${WHITE}$cpu_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}CPU核心数:${NC}      ${WHITE}$cpu_cores${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}CPU频率:${NC}        ${WHITE}$cpu_freq${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}CPU占用:${NC}        ${WHITE}${cpu_usage}%${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}内存使用:${NC}       ${WHITE}$mem_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}交换分区:${NC}       ${WHITE}$swap_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}磁盘使用:${NC}       ${WHITE}$disk_info${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}网络信息${NC}                                         ${BLUE}║${NC}"
+    # 获取操作系统信息
+    local os_info=$(cat /etc/os-release | grep "PRETTY_NAME" | cut -d "=" -f 2 | tr -d '"')
+    print_info "操作系统" "$os_info"
+    
+    # 获取内核版本
+    local kernel=$(uname -r)
+    print_info "内核版本" "$kernel"
+    
+    # 获取运行时间
+    local uptime=$(uptime -p | sed 's/up //')
+    print_info "运行时间" "$uptime"
+    
+    # 获取负载
+    local load=$(cat /proc/loadavg | awk '{print $1", "$2", "$3}')
+    print_info "系统负载" "$load"
+    
+    # 获取CPU信息
+    local cpu_model=$(cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d ":" -f 2 | sed 's/^[ \t]*//')
+    local cpu_cores=$(cat /proc/cpuinfo | grep "processor" | wc -l)
+    local cpu_freq=$(cat /proc/cpuinfo | grep "cpu MHz" | head -n 1 | cut -d ":" -f 2 | sed 's/^[ \t]*//' | awk '{printf "%.2f GHz", $1/1000}')
+    
+    print_info "CPU型号" "$cpu_model"
+    print_info "CPU核心数" "$cpu_cores"
+    print_info "CPU频率" "$cpu_freq"
+    
+    # 获取内存使用情况
+    local mem_total=$(free -h | grep "Mem" | awk '{print $2}')
+    local mem_used=$(free -h | grep "Mem" | awk '{print $3}')
+    local mem_free=$(free -h | grep "Mem" | awk '{print $4}')
+    local mem_usage=$(free | grep Mem | awk '{printf "%.2f%%", $3/$2 * 100}')
+    
+    print_info "内存总量" "$mem_total"
+    print_info "已用内存" "$mem_used ($mem_usage)"
+    print_info "可用内存" "$mem_free"
+    
+    # 获取交换分区信息
+    local swap_total=$(free -h | grep "Swap" | awk '{print $2}')
+    local swap_used=$(free -h | grep "Swap" | awk '{print $3}')
+    local swap_free=$(free -h | grep "Swap" | awk '{print $4}')
+    
+    print_info "交换分区总量" "$swap_total"
+    print_info "已用交换分区" "$swap_used"
+    print_info "可用交换分区" "$swap_free"
+    
+    # 获取磁盘使用情况
+    echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}磁盘使用情况${NC}                                     ${BLUE}║${NC}"
     echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
     
-    # Show IP information
-    echo -e "${BLUE}║${NC} $(get_ip_address | sed 's/^/  /')"
+    # 表头
+    printf "${BLUE}║${NC} ${CYAN}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}║${NC}\n" "挂载点" "总容量" "已用空间" "可用空间" "使用率"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
     
-    # Get network information about the country and ISP using ipinfo.io
-    ip_info=$(curl -s ipinfo.io)
-    country=$(echo "$ip_info" | grep -oP '"country": "\K[^"]+')
-    region=$(echo "$ip_info" | grep -oP '"region": "\K[^"]+')
-    city=$(echo "$ip_info" | grep -oP '"city": "\K[^"]+')
-    isp=$(echo "$ip_info" | grep -oP '"org": "\K[^"]+')
+    # 磁盘信息
+    df -h | grep -v "tmpfs" | grep -v "udev" | grep -v "loop" | grep -v "Filesystem" | while read line; do
+        local mount=$(echo $line | awk '{print $6}')
+        local total=$(echo $line | awk '{print $2}')
+        local used=$(echo $line | awk '{print $3}')
+        local avail=$(echo $line | awk '{print $4}')
+        local usage=$(echo $line | awk '{print $5}')
+        
+        printf "${BLUE}║${NC} ${WHITE}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}║${NC}\n" "$mount" "$total" "$used" "$avail" "$usage"
+    done
     
-    # Display network information
-    echo -e "${BLUE}║${NC} ${CYAN}DNS 服务器:${NC}     ${WHITE}$dns_info${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}连接数:${NC}         ${WHITE}$connection_count${NC} (已建立: ${WHITE}$established_connections${NC})"
-    echo -e "${BLUE}║${NC} ${CYAN}网络位置:${NC}       ${WHITE}$country $region $city${NC}"
-    echo -e "${BLUE}║${NC} ${CYAN}运营商:${NC}         ${WHITE}$isp${NC}"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
+    # 获取DNS服务器
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}DNS服务器${NC}                                        ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    cat /etc/resolv.conf | grep "nameserver" | while read line; do
+        local dns=$(echo $line | awk '{print $2}')
+        printf "${BLUE}║${NC} ${WHITE}%-65s${NC} ${BLUE}║${NC}\n" "$dns"
+    done
+    
+    # 获取网络接口信息
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}网络接口${NC}                                         ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    # 表头
+    printf "${BLUE}║${NC} ${CYAN}%-12s %-18s %-18s %-12s${NC} ${BLUE}║${NC}\n" "接口名" "IP地址" "MAC地址" "状态"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    # 网络接口信息
+    ip -o addr show | grep -v "lo" | grep -v "docker" | grep -v "br-" | grep -v "veth" | while read line; do
+        local interface=$(echo $line | awk '{print $2}')
+        local ip=$(echo $line | awk '{print $4}')
+        local mac=$(ip link show $interface | grep "link/ether" | awk '{print $2}')
+        local status=$(ip link show $interface | grep -oP '(?<=state )[^ ]*')
+        
+        printf "${BLUE}║${NC} ${WHITE}%-12s %-18s %-18s %-12s${NC} ${BLUE}║${NC}\n" "$interface" "$ip" "$mac" "$status"
+    done
 }
 
 # 显示模块标题栏函数
@@ -128,9 +178,14 @@ show_module_header() {
     clear
     echo ""
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                ${BOLD}${CYAN}ServerMaster${NC} - ${YELLOW}$title${NC}                             ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    
+    # 使用printf居中显示标题
+    local title_text="${BOLD}${CYAN}ServerMaster${NC} - ${YELLOW}$title${NC}"
+    local title_length=${#title_text}
+    local padding=$(( (65 - title_length) / 2 ))
+    
+    printf "${BLUE}║${NC}%${padding}s%s%${padding}s${BLUE}║${NC}\n" "" "$title_text" ""
+    
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -139,9 +194,14 @@ show_module_header() {
 show_module_footer() {
     echo ""
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                     ${YELLOW}按回车键返回上一级菜单...${NC}                           ${BLUE}║${NC}"
-    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    
+    # 使用printf居中显示提示信息
+    local footer_text="${YELLOW}按回车键返回上一级菜单...${NC}"
+    local footer_length=${#footer_text}
+    local padding=$(( (65 - footer_length) / 2 ))
+    
+    printf "${BLUE}║${NC}%${padding}s%s%${padding}s${BLUE}║${NC}\n" "" "$footer_text" ""
+    
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
     read
 }
@@ -149,14 +209,48 @@ show_module_footer() {
 # 主函数
 main() {
     # 显示模块标题
-    show_module_header "系统信息查询"
+    show_module_header "系统信息"
     
-    # 显示系统信息
+    # 显示系统信息部分
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${CYAN}基本系统信息${NC}                                     ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    # 获取系统信息
     get_system_info
     
-    # 显示底部
+    # 显示IP地址信息部分
+    echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}网络连接信息${NC}                                     ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    # 获取IP地址信息
+    get_ip_address
+    
+    # 尝试获取地理位置信息
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}地理位置信息${NC}                                     ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    
+    ip_info=$(curl -s --connect-timeout 5 ipinfo.io 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$ip_info" ]; then
+        country=$(echo "$ip_info" | grep -oP '"country": "\K[^"]+' 2>/dev/null)
+        region=$(echo "$ip_info" | grep -oP '"region": "\K[^"]+' 2>/dev/null)
+        city=$(echo "$ip_info" | grep -oP '"city": "\K[^"]+' 2>/dev/null)
+        isp=$(echo "$ip_info" | grep -oP '"org": "\K[^"]+' 2>/dev/null)
+        
+        print_info "国家/地区" "${country:-未知}"
+        print_info "省份/城市" "${region:-未知}/${city:-未知}"
+        print_info "运营商" "${isp:-未知}"
+    else
+        printf "${BLUE}║${NC} ${RED}%-65s${NC} ${BLUE}║${NC}\n" "无法获取地理位置信息，请检查网络连接"
+    fi
+    
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    
+    # 显示模块底部
     show_module_footer
 }
 
 # 执行主函数
-main
+main "$@"
