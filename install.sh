@@ -377,6 +377,7 @@ check_installed_version() {
     return 0
 }
 
+
 # Main installation process
 main() {
     show_banner
