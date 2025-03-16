@@ -100,15 +100,17 @@ check_connectivity() {
 check_version() {
     echo -e "${CYAN}[2/5] 检查版本信息...${NC}"
     
-    # 获取当前版本
+    # 获取当前版本 - 处理可能的BOM和特殊字符
     if [ -f "$BASE_DIR/version.txt" ]; then
-        CURRENT_VERSION=$(cat "$BASE_DIR/version.txt")
+        # 使用tr命令移除不可见字符，并确保只保留有效的版本号字符
+        CURRENT_VERSION=$(tr -cd '0-9\.\n' < "$BASE_DIR/version.txt")
     else
         CURRENT_VERSION="未知"
     fi
     
-    # 获取最新版本
-    LATEST_VERSION=$(curl -s "$BASE_URL/version.txt")
+    # 获取最新版本 - 同样处理可能的特殊字符
+    LATEST_VERSION_RAW=$(curl -s "$BASE_URL/version.txt")
+    LATEST_VERSION=$(echo "$LATEST_VERSION_RAW" | tr -cd '0-9\.\n')
     
     echo -e "    ${CYAN}   - 当前版本: ${YELLOW}$CURRENT_VERSION${NC}"
     echo -e "    ${CYAN}   - 最新版本: ${GREEN}$LATEST_VERSION${NC}"
@@ -180,9 +182,9 @@ update_files() {
         cp -r "$TEMP_DIR/config_backup"/* "$CONFIG_DIR/"
     fi
     
-    # 更新版本文件
+    # 更新版本文件 - 确保使用UTF-8编码，不带BOM
     echo -e "    ${CYAN}   - 更新版本信息...${NC}"
-    echo "$LATEST_VERSION" > "$BASE_DIR/version.txt"
+    echo -n "$LATEST_VERSION" > "$BASE_DIR/version.txt"
     
     echo -e "    ${GREEN}✓${NC} 文件更新完成"
 }

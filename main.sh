@@ -134,16 +134,20 @@ download_module() {
 check_updates() {
     echo -e "${CYAN}正在检查更新...${NC}"
     
-    # 读取本地版本号
+    # 读取本地版本号 - 处理可能的BOM和特殊字符
     if [ -f "$BASE_DIR/version.txt" ]; then
-        VERSION=$(cat "$BASE_DIR/version.txt")
+        # 使用tr命令移除不可见字符，并确保只保留有效的版本号字符
+        VERSION=$(tr -cd '0-9\.\n' < "$BASE_DIR/version.txt")
     fi
     
-    # Get the latest version number (尝试三个源)
-    local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
+    # Get the latest version number (尝试三个源) - 同样处理可能的特殊字符
+    local latest_version_raw=$(curl -s "$CF_PROXY_URL/version.txt" || 
                           curl -s "$GITHUB_RAW/version.txt" || 
                           curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
                           echo "unknown")
+    
+    # 清理版本号，确保只包含有效字符
+    local latest_version=$(echo "$latest_version_raw" | tr -cd '0-9\.\n')
     
     if [ "$latest_version" = "unknown" ]; then
         echo -e "${RED}无法获取最新版本信息!${NC}"
@@ -211,8 +215,8 @@ update_system() {
                 cp -r "$TEMP_DIR/config_backup"/* "$CONFIG_DIR/"
             fi
             
-            # 更新版本号
-            echo "$latest_version" > "$BASE_DIR/version.txt"
+            # 更新版本号 - 确保使用UTF-8编码，不带BOM
+            echo -n "$latest_version" > "$BASE_DIR/version.txt"
             
             echo -e "${GREEN}更新成功! 新版本: $latest_version${NC}"
             echo -e "${CYAN}正在重启系统...${NC}"

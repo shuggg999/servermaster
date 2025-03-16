@@ -276,9 +276,9 @@ create_command() {
 finalize() {
     echo -e "\n${CYAN}[步骤 7/7] 完成安装...${NC}"
     
-    # Create version file
+    # Create version file - 确保使用UTF-8编码，不带BOM
     echo -e "    ${CYAN}   - 创建版本信息文件...${NC}"
-    echo "$VERSION" > "$INSTALL_DIR/version.txt"
+    echo -n "$VERSION" > "$INSTALL_DIR/version.txt"
     
     # Set proper permissions
     echo -e "    ${CYAN}   - 设置权限...${NC}"
@@ -316,13 +316,17 @@ show_installation_steps() {
 # 检查是否已安装并比较版本
 check_installed_version() {
     if [ -f "$INSTALL_DIR/version.txt" ]; then
-        local installed_version=$(cat "$INSTALL_DIR/version.txt")
+        # 使用tr命令移除不可见字符，并确保只保留有效的版本号字符
+        local installed_version=$(tr -cd '0-9\.\n' < "$INSTALL_DIR/version.txt")
         
-        # 获取最新版本号
-        local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
+        # 获取最新版本号 - 同样处理可能的特殊字符
+        local latest_version_raw=$(curl -s "$CF_PROXY_URL/version.txt" || 
                               curl -s "$GITHUB_RAW/version.txt" || 
                               curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
                               echo "$VERSION")
+        
+        # 清理版本号，确保只包含有效字符
+        local latest_version=$(echo "$latest_version_raw" | tr -cd '0-9\.\n')
         
         echo -e "    ${CYAN}   - 检查版本信息...${NC}"
         echo -e "    ${CYAN}   - 已安装版本: ${YELLOW}$installed_version${NC}"
