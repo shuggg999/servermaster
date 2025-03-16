@@ -165,12 +165,8 @@ check_updates() {
     
     # Compare versions
     if [ "$VERSION" != "$latest_version" ]; then
-        echo -e "${YELLOW}发现新版本! 是否更新? (y/n)${NC}"
-        read -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            update_system "$latest_version"
-        fi
+        echo -e "${YELLOW}发现新版本，准备自动更新...${NC}"
+        update_system "$latest_version"
     else
         echo -e "${GREEN}系统已是最新版本!${NC}"
         sleep 1
