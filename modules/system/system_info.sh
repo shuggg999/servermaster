@@ -15,6 +15,12 @@ if [ -z "$GREEN" ]; then
     WHITE='\033[1;37m'
     GRAY='\033[0;37m'
     NC='\033[0m'
+    BOLD='\033[1m'
+    DIM='\033[2m'
+    UNDERLINE='\033[4m'
+    BLINK='\033[5m'
+    REVERSE='\033[7m'
+    HIDDEN='\033[8m'
 fi
 
 # Function to get IP address information
@@ -29,7 +35,6 @@ get_ip_address() {
         echo -e "${CYAN}IPv6 地址:${NC} ${GRAY}不可用${NC}"
     fi
 }
-
 
 # Function to get system information
 get_system_info() {
@@ -76,24 +81,30 @@ get_system_info() {
 
     # Display system information
     echo ""
-    echo -e "${BRIGHT_GREEN}┌──────────────────── 系统信息 ────────────────────┐${NC}"
-    echo -e "${CYAN}主机名:${NC}         ${WHITE}$hostname${NC}"
-    echo -e "${CYAN}操作系统:${NC}       ${WHITE}$os_info${NC}"
-    echo -e "${CYAN}内核版本:${NC}       ${WHITE}$kernel_version${NC}"
-    echo -e "${CYAN}运行时间:${NC}       ${WHITE}$uptime_info${NC}"
-    echo -e "${CYAN}负载情况:${NC}       ${WHITE}$load_avg${NC}"
-    echo -e "${BRIGHT_GREEN}├──────────────────── 硬件信息 ────────────────────┤${NC}"
-    echo -e "${CYAN}CPU型号:${NC}        ${WHITE}$cpu_info${NC}"
-    echo -e "${CYAN}CPU核心数:${NC}      ${WHITE}$cpu_cores${NC}"
-    echo -e "${CYAN}CPU频率:${NC}        ${WHITE}$cpu_freq${NC}"
-    echo -e "${CYAN}CPU占用:${NC}        ${WHITE}${cpu_usage}%${NC}"
-    echo -e "${CYAN}内存使用:${NC}       ${WHITE}$mem_info${NC}"
-    echo -e "${CYAN}交换分区:${NC}       ${WHITE}$swap_info${NC}"
-    echo -e "${CYAN}磁盘使用:${NC}       ${WHITE}$disk_info${NC}"
-    echo -e "${BRIGHT_GREEN}├──────────────────── 网络信息 ────────────────────┤${NC}"
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${CYAN}系统信息${NC}                                         ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}主机名:${NC}         ${WHITE}$hostname${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}操作系统:${NC}       ${WHITE}$os_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}内核版本:${NC}       ${WHITE}$kernel_version${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}运行时间:${NC}       ${WHITE}$uptime_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}负载情况:${NC}       ${WHITE}$load_avg${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${MAGENTA}硬件信息${NC}                                         ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}CPU型号:${NC}        ${WHITE}$cpu_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}CPU核心数:${NC}      ${WHITE}$cpu_cores${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}CPU频率:${NC}        ${WHITE}$cpu_freq${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}CPU占用:${NC}        ${WHITE}${cpu_usage}%${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}内存使用:${NC}       ${WHITE}$mem_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}交换分区:${NC}       ${WHITE}$swap_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}磁盘使用:${NC}       ${WHITE}$disk_info${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}网络信息${NC}                                         ${BLUE}║${NC}"
+    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
     
     # Show IP information
-    get_ip_address
+    echo -e "${BLUE}║${NC} $(get_ip_address | sed 's/^/  /')"
     
     # Get network information about the country and ISP using ipinfo.io
     ip_info=$(curl -s ipinfo.io)
@@ -103,27 +114,49 @@ get_system_info() {
     isp=$(echo "$ip_info" | grep -oP '"org": "\K[^"]+')
     
     # Display network information
-    echo -e "${CYAN}DNS 服务器:${NC}     ${WHITE}$dns_info${NC}"
-    echo -e "${CYAN}连接数:${NC}         ${WHITE}$connection_count${NC} (已建立: ${WHITE}$established_connections${NC})"
-    echo -e "${CYAN}网络位置:${NC}       ${WHITE}$country $region $city${NC}"
-    echo -e "${CYAN}运营商:${NC}         ${WHITE}$isp${NC}"
-    echo -e "${BRIGHT_GREEN}└────────────────────────────────────────────────┘${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}DNS 服务器:${NC}     ${WHITE}$dns_info${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}连接数:${NC}         ${WHITE}$connection_count${NC} (已建立: ${WHITE}$established_connections${NC})"
+    echo -e "${BLUE}║${NC} ${CYAN}网络位置:${NC}       ${WHITE}$country $region $city${NC}"
+    echo -e "${BLUE}║${NC} ${CYAN}运营商:${NC}         ${WHITE}$isp${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
 
-# Clear the screen
-clear
+# 显示模块标题栏函数
+show_module_header() {
+    local title="$1"
+    clear
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}                ${BOLD}${CYAN}ServerMaster${NC} - ${YELLOW}$title${NC}                             ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
 
-# Show header
-echo -e "${YELLOW}★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★${NC}"
-echo -e "                               ${CYAN}${BOLD}「 系统信息查询 」${NC}"
-echo -e "                               ${BLUE}===============================${NC}"
-echo -e "${YELLOW}★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★${NC}"
-echo ""
+# 显示模块底部函数
+show_module_footer() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}                     ${YELLOW}按回车键返回上一级菜单...${NC}                           ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}                                                                       ${BLUE}║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    read
+}
 
-# Show system information
-get_system_info
+# 主函数
+main() {
+    # 显示模块标题
+    show_module_header "系统信息查询"
+    
+    # 显示系统信息
+    get_system_info
+    
+    # 显示底部
+    show_module_footer
+}
 
-# Wait for user input before returning
-echo -e "${YELLOW}按回车键返回上一级菜单...${NC}"
-read
+# 执行主函数
+main
