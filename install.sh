@@ -20,6 +20,8 @@ VERSION="1.0"
 GITHUB_REPO="https://github.com/shuggg999/servermaster"
 GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
+# 添加Cloudflare Workers代理URL
+CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
 # Installation paths
 INSTALL_DIR="/usr/local/servermaster"
@@ -131,27 +133,41 @@ create_directories() {
 check_connectivity() {
     echo -e "\n${CYAN}[步骤 3/7] 检查网络连接...${NC}"
     
-    # Test direct GitHub connection
-    echo -e "    ${CYAN}   - 测试 GitHub 直连...${NC}"
-    if curl -s --head --fail "$GITHUB_RAW/version.txt" > /dev/null; then
-        echo -e "    ${GREEN}✓${NC} GitHub 连接正常"
+    # 首先尝试Cloudflare Workers代理
+    echo -e "    ${CYAN}   - 测试 Cloudflare Workers 代理...${NC}"
+    if curl -s --head --fail "$CF_PROXY_URL/version.txt" > /dev/null; then
+        echo -e "    ${GREEN}✓${NC} Cloudflare Workers 代理连接正常"
+        USE_CF_PROXY=true
         USE_MIRROR=false
     else
-        echo -e "    ${YELLOW}!${NC} GitHub 连接受限，尝试使用镜像站..."
+        # 如果CF代理失败，尝试直接GitHub连接
+        echo -e "    ${YELLOW}!${NC} Cloudflare Workers 代理连接受限，尝试直连GitHub..."
         
-        # Test mirror connection
-        echo -e "    ${CYAN}   - 测试镜像站连接...${NC}"
-        if curl -s --head --fail "${MIRROR_URL}${GITHUB_RAW}/version.txt" > /dev/null; then
-            echo -e "    ${GREEN}✓${NC} 镜像站连接正常"
-            USE_MIRROR=true
+        echo -e "    ${CYAN}   - 测试 GitHub 直连...${NC}"
+        if curl -s --head --fail "$GITHUB_RAW/version.txt" > /dev/null; then
+            echo -e "    ${GREEN}✓${NC} GitHub 连接正常"
+            USE_CF_PROXY=false
+            USE_MIRROR=false
         else
-            echo -e "    ${RED}✗${NC} 无法连接到 GitHub 或镜像站!"
-            exit 1
+            echo -e "    ${YELLOW}!${NC} GitHub 连接受限，尝试使用镜像站..."
+            
+            # 最后尝试镜像站
+            echo -e "    ${CYAN}   - 测试镜像站连接...${NC}"
+            if curl -s --head --fail "${MIRROR_URL}${GITHUB_RAW}/version.txt" > /dev/null; then
+                echo -e "    ${GREEN}✓${NC} 镜像站连接正常"
+                USE_CF_PROXY=false
+                USE_MIRROR=true
+            else
+                echo -e "    ${RED}✗${NC} 无法连接到 GitHub、Cloudflare Workers 代理或镜像站!"
+                exit 1
+            fi
         fi
     fi
     
     # Set the base URL based on connectivity test
-    if [ "$USE_MIRROR" = true ]; then
+    if [ "$USE_CF_PROXY" = true ]; then
+        BASE_URL="${CF_PROXY_URL}"
+    elif [ "$USE_MIRROR" = true ]; then
         BASE_URL="${MIRROR_URL}${GITHUB_RAW}"
     else
         BASE_URL="${GITHUB_RAW}"

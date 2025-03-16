@@ -33,6 +33,8 @@ NC='\033[0m'
 GITHUB_REPO="https://github.com/shuggg999/servermaster"
 GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
+# 添加Cloudflare Workers代理URL
+CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
 # Current menu path for breadcrumb navigation
 MENU_PATH=""
@@ -100,22 +102,30 @@ download_module() {
     # Create directory if it doesn't exist
     mkdir -p "$module_dir"
     
-    # Try direct GitHub download first
-    if curl -s -o "$MODULES_DIR/$module_path" "$GITHUB_RAW/modules/$module_path"; then
+    # 首先尝试Cloudflare Workers代理
+    if curl -s -o "$MODULES_DIR/$module_path" "$CF_PROXY_URL/modules/$module_path"; then
         chmod +x "$MODULES_DIR/$module_path"
-        echo -e "${GREEN}模块下载成功!${NC}"
+        echo -e "${GREEN}模块从Cloudflare Workers代理下载成功!${NC}"
         return 0
     else
-        # Try mirror
-        echo -e "${YELLOW}GitHub 下载失败，尝试使用镜像站...${NC}"
-        if curl -s -o "$MODULES_DIR/$module_path" "${MIRROR_URL}${GITHUB_RAW}/modules/$module_path"; then
+        # 尝试直接GitHub下载
+        echo -e "${YELLOW}Cloudflare Workers代理下载失败，尝试直连GitHub...${NC}"
+        if curl -s -o "$MODULES_DIR/$module_path" "$GITHUB_RAW/modules/$module_path"; then
             chmod +x "$MODULES_DIR/$module_path"
-            echo -e "${GREEN}模块从镜像站下载成功!${NC}"
+            echo -e "${GREEN}模块从GitHub下载成功!${NC}"
             return 0
         else
-            echo -e "${RED}无法下载模块!${NC}"
-            log "ERROR" "无法下载模块: $module_path"
-            return 1
+            # 最后尝试镜像站
+            echo -e "${YELLOW}GitHub 下载失败，尝试使用镜像站...${NC}"
+            if curl -s -o "$MODULES_DIR/$module_path" "${MIRROR_URL}${GITHUB_RAW}/modules/$module_path"; then
+                chmod +x "$MODULES_DIR/$module_path"
+                echo -e "${GREEN}模块从镜像站下载成功!${NC}"
+                return 0
+            else
+                echo -e "${RED}无法下载模块!${NC}"
+                log "ERROR" "无法下载模块: $module_path"
+                return 1
+            fi
         fi
     fi
 }
@@ -124,8 +134,9 @@ download_module() {
 check_updates() {
     echo -e "${CYAN}正在检查更新...${NC}"
     
-    # Get the latest version number
-    local latest_version=$(curl -s "$GITHUB_RAW/version.txt" || 
+    # Get the latest version number (尝试三个源)
+    local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
+                          curl -s "$GITHUB_RAW/version.txt" || 
                           curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
                           echo "unknown")
     
@@ -155,8 +166,9 @@ check_updates() {
 update_system() {
     echo -e "${CYAN}正在更新系统...${NC}"
     
-    # Download the update script
-    if curl -s -o "$TEMP_DIR/update.sh" "$GITHUB_RAW/update.sh" || 
+    # 尝试三个源下载更新脚本
+    if curl -s -o "$TEMP_DIR/update.sh" "$CF_PROXY_URL/update.sh" || 
+       curl -s -o "$TEMP_DIR/update.sh" "$GITHUB_RAW/update.sh" || 
        curl -s -o "$TEMP_DIR/update.sh" "${MIRROR_URL}${GITHUB_RAW}/update.sh"; then
         chmod +x "$TEMP_DIR/update.sh"
         
@@ -286,6 +298,8 @@ show_main_menu() {
     echo ""
     echo -e "                          ${CYAN}◆ [U]${NC} ${WHITE}脚本更新${NC}"
     echo ""
+    echo -e "                          ${RED}◆ [X]${NC} ${WHITE}卸载系统${NC}"
+    echo ""
     echo -e "                          ${RED}◆ [0]${NC} ${WHITE}退出系统${NC}"
     
     show_menu_footer
@@ -303,6 +317,7 @@ process_main_menu() {
         4) advanced_features ;;
         5) special_features ;;
         U|u) check_updates ;;
+        X|x) uninstall_system ;;
         0) 
             echo -e "${RED}正在退出系统...${NC}"
             echo -e "${GREEN}感谢使用 ServerMaster!${NC}"
@@ -802,6 +817,72 @@ process_special_menu() {
             special_features
             ;;
     esac
+}
+
+# Function to uninstall the system
+uninstall_system() {
+    clear
+    echo -e "${RED}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║${NC}                                                                       ${RED}║${NC}"
+    echo -e "${RED}║${NC}                ${BOLD}${RED}警告: 即将卸载 ServerMaster 系统${NC}                      ${RED}║${NC}"
+    echo -e "${RED}║${NC}                                                                       ${RED}║${NC}"
+    echo -e "${RED}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}此操作将删除以下内容:${NC}"
+    echo -e " ${CYAN}• 所有 ServerMaster 脚本和模块${NC}"
+    echo -e " ${CYAN}• 配置文件和日志${NC}"
+    echo -e " ${CYAN}• 临时文件和下载的压缩包${NC}"
+    echo -e " ${CYAN}• 系统命令链接 (sm)${NC}"
+    echo ""
+    echo -e "${RED}注意: 此操作不可逆! 所有 ServerMaster 数据将被永久删除!${NC}"
+    echo ""
+    echo -e "${YELLOW}确认卸载 ServerMaster? (输入 '${RED}yes${YELLOW}' 确认卸载)${NC}"
+    read -r confirmation
+    
+    if [ "$confirmation" = "yes" ]; then
+        echo ""
+        echo -e "${CYAN}开始卸载 ServerMaster...${NC}"
+        
+        # Remove command link
+        echo -e "${CYAN}[1/4] 删除命令链接...${NC}"
+        rm -f /usr/local/bin/sm
+        if [ -f "/etc/bash_completion.d/sm" ]; then
+            rm -f /etc/bash_completion.d/sm
+        fi
+        echo -e "${GREEN}✓${NC} 命令链接已删除"
+        
+        # Remove temporary files
+        echo -e "${CYAN}[2/4] 删除临时文件...${NC}"
+        rm -rf /tmp/servermaster
+        rm -f /tmp/servermaster_modules.tar.gz
+        echo -e "${GREEN}✓${NC} 临时文件已删除"
+        
+        # Remove main directory
+        echo -e "${CYAN}[3/4] 删除主目录...${NC}"
+        rm -rf "$BASE_DIR"
+        echo -e "${GREEN}✓${NC} 主目录已删除"
+        
+        # Final cleanup
+        echo -e "${CYAN}[4/4] 完成清理...${NC}"
+        echo -e "${GREEN}✓${NC} ServerMaster 已完全卸载!"
+        
+        echo ""
+        echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║${NC}                                                                       ${GREEN}║${NC}"
+        echo -e "${GREEN}║${NC}                ${BOLD}${GREEN}ServerMaster 已成功卸载!${NC}                           ${GREEN}║${NC}"
+        echo -e "${GREEN}║${NC}                                                                       ${GREEN}║${NC}"
+        echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+        
+        echo ""
+        echo -e "${YELLOW}感谢您使用 ServerMaster! 再见!${NC}"
+        sleep 2
+        exit 0
+    else
+        echo ""
+        echo -e "${YELLOW}卸载已取消，返回主菜单...${NC}"
+        sleep 1
+        show_main_menu
+    fi
 }
 
 # Check command line arguments
