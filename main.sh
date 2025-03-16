@@ -30,8 +30,8 @@ BLINK='\033[5m'
 NC='\033[0m'
 
 # GitHub repository information
-GITHUB_REPO="https://github.com/servermaster/servermaster"
-GITHUB_RAW="https://raw.githubusercontent.com/servermaster/servermaster/main"
+GITHUB_REPO="https://github.com/shuggg999/servermaster"
+GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 
 # Current menu path for breadcrumb navigation
@@ -357,10 +357,515 @@ system_management() {
 # Process system management menu selection
 process_system_menu() {
     case "$1" in
-        1) execute_module "system/system_info.sh" && system_management ;;
-        2) execute_module "system/system_update.sh" && system_management ;;
-        3) execute_module "system/system_clean.sh" && system_management ;;
-        4) execute_module "system/system_reinstall.sh" && system_management ;;
-        5) execute_module "system/timezone_setup.sh" && system_management ;;
-        6) execute_module "system/ssh_port.sh" && system_management ;;
-        7) execute_module "system/virtual_memory.sh"
+        1) execute_module "system/system_info.sh" && show_pause && system_management ;;
+        2) execute_module "system/system_update.sh" && show_pause && system_management ;;
+        3) execute_module "system/system_clean.sh" && show_pause && system_management ;;
+        4) execute_module "system/system_reinstall.sh" && show_pause && system_management ;;
+        5) execute_module "system/timezone_setup.sh" && show_pause && system_management ;;
+        6) execute_module "system/ssh_port.sh" && show_pause && system_management ;;
+        7) execute_module "system/virtual_memory.sh" && show_pause && system_management ;;
+        8) execute_module "system/user_management.sh" && show_pause && system_management ;;
+        9) execute_module "system/cron_management.sh" && show_pause && system_management ;;
+        0) show_main_menu ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            system_management
+            ;;
+    esac
+}
+
+# Network management menu
+network_management() {
+    MENU_PATH="网络管理"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}BBR管理${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}防火墙管理${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}WARP管理${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}网络测试${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}VPN管理${NC}"
+    echo ""
+    echo -e "                          ${CYAN}◆ [6]${NC} ${WHITE}代理管理${NC}"
+    echo ""
+    echo -e "                          ${RED}◆ [7]${NC} ${WHITE}DNS管理${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回主菜单${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_network_menu "$choice"
+}
+
+# Process network management menu selection
+process_network_menu() {
+    case "$1" in
+        1) execute_module "network/bbr_manager.sh" && show_pause && network_management ;;
+        2) execute_module "network/firewall_manager.sh" && show_pause && network_management ;;
+        3) execute_module "network/warp_manager.sh" && show_pause && network_management ;;
+        4) execute_module "network/network_test.sh" && show_pause && network_management ;;
+        5) vpn_menu ;;
+        6) proxy_menu ;;
+        7) execute_module "network/dns_manager.sh" && show_pause && network_management ;;
+        0) show_main_menu ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            network_management
+            ;;
+    esac
+}
+
+# VPN management submenu
+vpn_menu() {
+    MENU_PATH="网络管理/VPN管理"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}OpenVPN管理${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}WireGuard管理${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}L2TP管理${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}PPTP管理${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}IPsec管理${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回上一级${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_vpn_menu "$choice"
+}
+
+# Process VPN management menu selection
+process_vpn_menu() {
+    case "$1" in
+        1) execute_module "network/vpn/openvpn_manager.sh" && show_pause && vpn_menu ;;
+        2) execute_module "network/vpn/wireguard_manager.sh" && show_pause && vpn_menu ;;
+        3) execute_module "network/vpn/l2tp_manager.sh" && show_pause && vpn_menu ;;
+        4) execute_module "network/vpn/pptp_manager.sh" && show_pause && vpn_menu ;;
+        5) execute_module "network/vpn/ipsec_manager.sh" && show_pause && vpn_menu ;;
+        0) network_management ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            vpn_menu
+            ;;
+    esac
+}
+
+# Proxy management submenu
+proxy_menu() {
+    MENU_PATH="网络管理/代理管理"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}Nginx反向代理${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}Squid代理${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}V2Ray管理${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}Trojan管理${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}Shadowsocks管理${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回上一级${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_proxy_menu "$choice"
+}
+
+# Process proxy management menu selection
+process_proxy_menu() {
+    case "$1" in
+        1) execute_module "network/proxy/nginx_proxy.sh" && show_pause && proxy_menu ;;
+        2) execute_module "network/proxy/squid_proxy.sh" && show_pause && proxy_menu ;;
+        3) execute_module "network/proxy/v2ray_manager.sh" && show_pause && proxy_menu ;;
+        4) execute_module "network/proxy/trojan_manager.sh" && show_pause && proxy_menu ;;
+        5) execute_module "network/proxy/shadowsocks_manager.sh" && show_pause && proxy_menu ;;
+        0) network_management ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            proxy_menu
+            ;;
+    esac
+}
+
+# Application and service menu
+application_service() {
+    MENU_PATH="应用与服务"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}Docker管理${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}LDNMP建站${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}面板集合${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}数据库管理${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}安全防护${NC}"
+    echo ""
+    echo -e "                          ${CYAN}◆ [6]${NC} ${WHITE}监控与告警${NC}"
+    echo ""
+    echo -e "                          ${RED}◆ [7]${NC} ${WHITE}文件管理${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回主菜单${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_application_menu "$choice"
+}
+
+# Process application and service menu selection
+process_application_menu() {
+    case "$1" in
+        1) execute_module "application/docker_manager.sh" && show_pause && application_service ;;
+        2) execute_module "application/ldnmp_manager.sh" && show_pause && application_service ;;
+        3) panels_menu ;;
+        4) database_menu ;;
+        5) security_menu ;;
+        6) execute_module "application/monitoring.sh" && show_pause && application_service ;;
+        7) execute_module "application/file_manager.sh" && show_pause && application_service ;;
+        0) show_main_menu ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            application_service
+            ;;
+    esac
+}
+
+# Panels submenu
+panels_menu() {
+    MENU_PATH="应用与服务/面板集合"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}宝塔面板${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}aaPanel${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}1Panel${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}ServerStatus${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}管理面板集成${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回上一级${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_panels_menu "$choice"
+}
+
+# Process panels menu selection
+process_panels_menu() {
+    case "$1" in
+        1) execute_module "application/panels/bt_panel.sh" && show_pause && panels_menu ;;
+        2) execute_module "application/panels/aa_panel.sh" && show_pause && panels_menu ;;
+        3) execute_module "application/panels/one_panel.sh" && show_pause && panels_menu ;;
+        4) execute_module "application/panels/server_status.sh" && show_pause && panels_menu ;;
+        5) execute_module "application/panels/integrated_panel.sh" && show_pause && panels_menu ;;
+        0) application_service ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            panels_menu
+            ;;
+    esac
+}
+
+# Database menu
+database_menu() {
+    MENU_PATH="应用与服务/数据库管理"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}MySQL管理${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}Redis管理${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}MongoDB管理${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}PostgreSQL管理${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}数据库备份恢复${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回上一级${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_database_menu "$choice"
+}
+
+# Process database menu selection
+process_database_menu() {
+    case "$1" in
+        1) execute_module "application/database/mysql_manager.sh" && show_pause && database_menu ;;
+        2) execute_module "application/database/redis_manager.sh" && show_pause && database_menu ;;
+        3) execute_module "application/database/mongodb_manager.sh" && show_pause && database_menu ;;
+        4) execute_module "application/database/postgresql_manager.sh" && show_pause && database_menu ;;
+        5) execute_module "application/database/backup_restore.sh" && show_pause && database_menu ;;
+        0) application_service ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            database_menu
+            ;;
+    esac
+}
+
+# Security menu
+security_menu() {
+    MENU_PATH="应用与服务/安全防护"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}SSH安全配置${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}Fail2Ban配置${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}防病毒设置${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}系统加固${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}防火墙设置${NC}"
+    echo ""
+    echo -e "                          ${CYAN}◆ [6]${NC} ${WHITE}安全审计${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回上一级${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_security_menu "$choice"
+}
+
+# Process security menu selection
+process_security_menu() {
+    case "$1" in
+        1) execute_module "application/security/ssh_security.sh" && show_pause && security_menu ;;
+        2) execute_module "application/security/fail2ban.sh" && show_pause && security_menu ;;
+        3) execute_module "application/security/antivirus.sh" && show_pause && security_menu ;;
+        4) execute_module "application/security/harden.sh" && show_pause && security_menu ;;
+        5) execute_module "application/security/firewall.sh" && show_pause && security_menu ;;
+        6) execute_module "application/security/audit.sh" && show_pause && security_menu ;;
+        0) application_service ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            security_menu
+            ;;
+    esac
+}
+
+# Advanced features menu
+advanced_features() {
+    MENU_PATH="高级功能"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}内核优化${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}自动备份${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}远程管理${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}集群控制${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}自动化脚本${NC}"
+    echo ""
+    echo -e "                          ${CYAN}◆ [6]${NC} ${WHITE}升级内核${NC}"
+    echo ""
+    echo -e "                          ${RED}◆ [7]${NC} ${WHITE}高级网络配置${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回主菜单${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_advanced_menu "$choice"
+}
+
+# Process advanced features menu selection
+process_advanced_menu() {
+    case "$1" in
+        1) execute_module "advanced/kernel_optimize.sh" && show_pause && advanced_features ;;
+        2) execute_module "advanced/auto_backup.sh" && show_pause && advanced_features ;;
+        3) execute_module "advanced/remote_management.sh" && show_pause && advanced_features ;;
+        4) execute_module "advanced/cluster_control.sh" && show_pause && advanced_features ;;
+        5) execute_module "advanced/automation.sh" && show_pause && advanced_features ;;
+        6) execute_module "advanced/kernel_upgrade.sh" && show_pause && advanced_features ;;
+        7) execute_module "advanced/network_config.sh" && show_pause && advanced_features ;;
+        0) show_main_menu ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            advanced_features
+            ;;
+    esac
+}
+
+# Special features menu
+special_features() {
+    MENU_PATH="特别功能"
+    show_menu_header
+    
+    echo ""
+    echo -e "                          ${BRIGHT_GREEN}◆ [1]${NC} ${WHITE}工作区${NC}"
+    echo ""
+    echo -e "                          ${GREEN}◆ [2]${NC} ${WHITE}甲骨文云工具${NC}"
+    echo ""
+    echo -e "                          ${BLUE}◆ [3]${NC} ${WHITE}游戏服务器${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [4]${NC} ${WHITE}AI模型部署${NC}"
+    echo ""
+    echo -e "                          ${MAGENTA}◆ [5]${NC} ${WHITE}流媒体服务${NC}"
+    echo ""
+    echo -e "                          ${CYAN}◆ [6]${NC} ${WHITE}开发者工具箱${NC}"
+    echo ""
+    
+    # Divider
+    echo -e "                          ${YELLOW}----------------------------------------${NC}"
+    echo ""
+    echo -e "                          ${YELLOW}◆ [0]${NC} ${WHITE}返回主菜单${NC}"
+    
+    show_menu_footer
+    
+    read choice
+    process_special_menu "$choice"
+}
+
+# Process special features menu selection
+process_special_menu() {
+    case "$1" in
+        1) execute_module "special/workspace.sh" && show_pause && special_features ;;
+        2) execute_module "special/oracle_cloud.sh" && show_pause && special_features ;;
+        3) execute_module "special/game_servers.sh" && show_pause && special_features ;;
+        4) execute_module "special/ai_models.sh" && show_pause && special_features ;;
+        5) execute_module "special/media_service.sh" && show_pause && special_features ;;
+        6) execute_module "special/dev_toolkit.sh" && show_pause && special_features ;;
+        0) show_main_menu ;;
+        *) 
+            echo -e "${RED}无效选项，请重新输入${NC}"
+            sleep 1
+            special_features
+            ;;
+    esac
+}
+
+# Check command line arguments
+if [ $# -eq 0 ]; then
+    # No arguments, show main menu
+    show_main_menu
+else
+    # Process command line arguments
+    case "$1" in
+        --version|-v)
+            echo "ServerMaster v$VERSION"
+            exit 0
+            ;;
+        --help|-h)
+            echo "ServerMaster v$VERSION - 模块化服务器管理系统"
+            echo ""
+            echo "使用方法: sm [选项] [命令]"
+            echo ""
+            echo "选项:"
+            echo "  -v, --version    显示版本信息"
+            echo "  -h, --help       显示帮助信息"
+            echo ""
+            echo "命令:"
+            echo "  update           检查并安装更新"
+            echo "  system           系统管理"
+            echo "  network          网络管理"
+            echo "  app              应用与服务管理"
+            echo "  module <模块路径> 直接执行指定模块"
+            echo ""
+            exit 0
+            ;;
+        update)
+            check_updates
+            exit 0
+            ;;
+        system)
+            system_management
+            ;;
+        network)
+            network_management
+            ;;
+        app)
+            application_service
+            ;;
+        advanced)
+            advanced_features
+            ;;
+        special)
+            special_features
+            ;;
+        module)
+            if [ -z "$2" ]; then
+                echo -e "${RED}错误: 未指定模块路径!${NC}"
+                echo "使用方法: sm module <模块路径>"
+                exit 1
+            fi
+            shift
+            execute_module "$@"
+            exit $?
+            ;;
+        *)
+            echo -e "${RED}错误: 未知命令 '$1'!${NC}"
+            echo "使用 'sm --help' 查看帮助信息"
+            exit 1
+            ;;
+    esac
+fi
