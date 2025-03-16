@@ -277,15 +277,10 @@ finalize() {
     echo -e "${CYAN}安装目录:${NC} $INSTALL_DIR"
     echo -e "${CYAN}启动命令:${NC} sm"
     echo -e ""
-    echo -e "${YELLOW}是否立即启动 ServerMaster? (y/n)${NC}"
-    read -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${CYAN}正在启动 ServerMaster...${NC}"
-        exec "$INSTALL_DIR/main.sh"
-    else
-        echo -e "${CYAN}您可以稍后使用 'sm' 命令启动系统。${NC}"
-    fi
+    
+    # 自动启动ServerMaster，无需用户确认
+    echo -e "${CYAN}正在启动 ServerMaster...${NC}"
+    exec "$INSTALL_DIR/main.sh"
 }
 
 # 显示安装进度概览
