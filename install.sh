@@ -276,9 +276,18 @@ create_command() {
 finalize() {
     echo -e "\n${CYAN}[步骤 7/7] 完成安装...${NC}"
     
+    # 获取最新版本号 - 同样处理可能的特殊字符
+    local latest_version_raw=$(curl -s "$CF_PROXY_URL/version.txt" || 
+                          curl -s "$GITHUB_RAW/version.txt" || 
+                          curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
+                          echo "$VERSION")
+    
+    # 清理版本号，确保只包含有效字符
+    local latest_version=$(echo "$latest_version_raw" | tr -cd '0-9\.\n')
+    
     # Create version file - 确保使用UTF-8编码，不带BOM
     echo -e "    ${CYAN}   - 创建版本信息文件...${NC}"
-    echo -n "$VERSION" > "$INSTALL_DIR/version.txt"
+    echo -n "$latest_version" > "$INSTALL_DIR/version.txt"
     
     # Set proper permissions
     echo -e "    ${CYAN}   - 设置权限...${NC}"
@@ -289,7 +298,7 @@ finalize() {
     echo -e "\n${GREEN}=========================================${NC}"
     echo -e "${GREEN}       ServerMaster 安装成功!      ${NC}"
     echo -e "${GREEN}=========================================${NC}"
-    echo -e "${CYAN}版本:${NC} $VERSION"
+    echo -e "${CYAN}版本:${NC} $latest_version"
     echo -e "${CYAN}安装目录:${NC} $INSTALL_DIR"
     echo -e "${CYAN}启动命令:${NC} sm"
     echo -e ""

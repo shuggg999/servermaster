@@ -3,7 +3,7 @@
 # ServerMaster - Main script
 # Modular server management system
 
-# Script version
+# 默认版本号
 VERSION="1.0.0"
 
 # Base directories
@@ -12,6 +12,11 @@ MODULES_DIR="$BASE_DIR/modules"
 CONFIG_DIR="$BASE_DIR/config"
 LOGS_DIR="$BASE_DIR/logs"
 TEMP_DIR="/tmp/servermaster"
+
+# 在设置了BASE_DIR后读取版本文件
+if [ -f "$BASE_DIR/version.txt" ]; then
+    VERSION=$(tr -cd '0-9\.\n' < "$BASE_DIR/version.txt")
+fi
 
 # Color definitions
 GREEN='\033[0;32m'
