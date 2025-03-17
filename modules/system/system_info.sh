@@ -3,6 +3,10 @@
 # System Information Query Module
 # For ServerMaster script
 
+# Set locale to ensure proper character display
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 # Check if colors are passed from the main script
 if [ -z "$GREEN" ]; then
     GREEN='\033[0;32m'
@@ -23,17 +27,30 @@ if [ -z "$GREEN" ]; then
     HIDDEN='\033[8m'
 fi
 
-# 打印单行信息的函数：label 和 value
+# Define box drawing characters
+BOX_TL="+"
+BOX_TR="+"
+BOX_BL="+"
+BOX_BR="+"
+BOX_H="-"
+BOX_V="|"
+BOX_VR="+"
+BOX_VL="+"
+BOX_HU="+"
+BOX_HD="+"
+BOX_HV="+"
+
+# Function to print information with label and value
 print_info() {
     local label="$1"
     local value="$2"
-    # 设置固定宽度，确保右侧边框对齐
-    printf "${BLUE}║${NC} ${CYAN}%-15s${NC} ${WHITE}%-50s${NC} ${BLUE}║${NC}\n" "$label:" "$value"
+    # Set fixed width to ensure right border alignment
+    printf "${BLUE}${BOX_V}${NC} ${CYAN}%-18s${NC} ${WHITE}%-47s${NC} ${BLUE}${BOX_V}${NC}\n" "$label:" "$value"
 }
 
 # Function to get IP address information
 get_ip_address() {
-    # 尝试从多个服务获取公网IPv4地址
+    # Try to get public IPv4 address from multiple services
     local ipv4=""
     local ipv4_sources=(
         "https://api.ipify.org"
@@ -48,7 +65,7 @@ get_ip_address() {
         fi
     done
     
-    # 尝试从多个服务获取公网IPv6地址
+    # Try to get public IPv6 address from multiple services
     local ipv6=""
     local ipv6_sources=(
         "https://api6.ipify.org"
@@ -63,75 +80,75 @@ get_ip_address() {
         fi
     done
     
-    # 获取本地IP地址
+    # Get local IP address
     local local_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v "127.0.0.1" | head -n 1)
     
-    # 显示IP地址信息
-    print_info "公网IPv4" "${ipv4:-未检测到}"
-    print_info "公网IPv6" "${ipv6:-未检测到}"
-    print_info "本地IPv4" "${local_ip:-未检测到}"
+    # Display IP address information
+    print_info "Public IPv4" "${ipv4:-Not detected}"
+    print_info "Public IPv6" "${ipv6:-Not detected}"
+    print_info "Local IPv4" "${local_ip:-Not detected}"
 }
 
-# 获取系统信息
+# Get system information
 get_system_info() {
-    # 获取主机名
+    # Get hostname
     local hostname=$(hostname)
-    print_info "主机名" "$hostname"
+    print_info "Hostname" "$hostname"
     
-    # 获取操作系统信息
+    # Get OS information
     local os_info=$(cat /etc/os-release | grep "PRETTY_NAME" | cut -d "=" -f 2 | tr -d '"')
-    print_info "操作系统" "$os_info"
+    print_info "Operating System" "$os_info"
     
-    # 获取内核版本
+    # Get kernel version
     local kernel=$(uname -r)
-    print_info "内核版本" "$kernel"
+    print_info "Kernel Version" "$kernel"
     
-    # 获取运行时间
+    # Get uptime
     local uptime=$(uptime -p | sed 's/up //')
-    print_info "运行时间" "$uptime"
+    print_info "Uptime" "$uptime"
     
-    # 获取负载
+    # Get load average
     local load=$(cat /proc/loadavg | awk '{print $1", "$2", "$3}')
-    print_info "系统负载" "$load"
+    print_info "Load Average" "$load"
     
-    # 获取CPU信息
+    # Get CPU information
     local cpu_model=$(cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d ":" -f 2 | sed 's/^[ \t]*//')
     local cpu_cores=$(cat /proc/cpuinfo | grep "processor" | wc -l)
     local cpu_freq=$(cat /proc/cpuinfo | grep "cpu MHz" | head -n 1 | cut -d ":" -f 2 | sed 's/^[ \t]*//' | awk '{printf "%.2f GHz", $1/1000}')
     
-    print_info "CPU型号" "$cpu_model"
-    print_info "CPU核心数" "$cpu_cores"
-    print_info "CPU频率" "$cpu_freq"
+    print_info "CPU Model" "$cpu_model"
+    print_info "CPU Cores" "$cpu_cores"
+    print_info "CPU Frequency" "$cpu_freq"
     
-    # 获取内存使用情况
+    # Get memory usage
     local mem_total=$(free -h | grep "Mem" | awk '{print $2}')
     local mem_used=$(free -h | grep "Mem" | awk '{print $3}')
     local mem_free=$(free -h | grep "Mem" | awk '{print $4}')
     local mem_usage=$(free | grep Mem | awk '{printf "%.2f%%", $3/$2 * 100}')
     
-    print_info "内存总量" "$mem_total"
-    print_info "已用内存" "$mem_used ($mem_usage)"
-    print_info "可用内存" "$mem_free"
+    print_info "Total Memory" "$mem_total"
+    print_info "Used Memory" "$mem_used ($mem_usage)"
+    print_info "Free Memory" "$mem_free"
     
-    # 获取交换分区信息
+    # Get swap information
     local swap_total=$(free -h | grep "Swap" | awk '{print $2}')
     local swap_used=$(free -h | grep "Swap" | awk '{print $3}')
     local swap_free=$(free -h | grep "Swap" | awk '{print $4}')
     
-    print_info "交换分区总量" "$swap_total"
-    print_info "已用交换分区" "$swap_used"
-    print_info "可用交换分区" "$swap_free"
+    print_info "Total Swap" "$swap_total"
+    print_info "Used Swap" "$swap_used"
+    print_info "Free Swap" "$swap_free"
     
-    # 获取磁盘使用情况
-    echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}磁盘使用情况${NC}                                     ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Get disk usage
+    echo -e "\n${BLUE}${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${YELLOW}DISK USAGE${NC}                                        ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 表头
-    printf "${BLUE}║${NC} ${CYAN}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}║${NC}\n" "挂载点" "总容量" "已用空间" "可用空间" "使用率"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Header
+    printf "${BLUE}${BOX_V}${NC} ${CYAN}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}${BOX_V}${NC}\n" "Mount Point" "Size" "Used" "Available" "Use%"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 磁盘信息
+    # Disk information
     df -h | grep -v "tmpfs" | grep -v "udev" | grep -v "loop" | grep -v "Filesystem" | while read line; do
         local mount=$(echo $line | awk '{print $6}')
         local total=$(echo $line | awk '{print $2}')
@@ -139,98 +156,98 @@ get_system_info() {
         local avail=$(echo $line | awk '{print $4}')
         local usage=$(echo $line | awk '{print $5}')
         
-        printf "${BLUE}║${NC} ${WHITE}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}║${NC}\n" "$mount" "$total" "$used" "$avail" "$usage"
+        printf "${BLUE}${BOX_V}${NC} ${WHITE}%-14s %-10s %-12s %-12s %-10s${NC} ${BLUE}${BOX_V}${NC}\n" "$mount" "$total" "$used" "$avail" "$usage"
     done
     
-    # 获取DNS服务器
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}DNS服务器${NC}                                        ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Get DNS servers
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${YELLOW}DNS SERVERS${NC}                                       ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
     cat /etc/resolv.conf | grep "nameserver" | while read line; do
         local dns=$(echo $line | awk '{print $2}')
-        printf "${BLUE}║${NC} ${WHITE}%-65s${NC} ${BLUE}║${NC}\n" "$dns"
+        printf "${BLUE}${BOX_V}${NC} ${WHITE}%-65s${NC} ${BLUE}${BOX_V}${NC}\n" "$dns"
     done
     
-    # 获取网络接口信息
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${YELLOW}网络接口${NC}                                         ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Get network interfaces
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${YELLOW}NETWORK INTERFACES${NC}                                ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 表头
-    printf "${BLUE}║${NC} ${CYAN}%-12s %-18s %-18s %-12s${NC} ${BLUE}║${NC}\n" "接口名" "IP地址" "MAC地址" "状态"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Header
+    printf "${BLUE}${BOX_V}${NC} ${CYAN}%-12s %-18s %-18s %-12s${NC} ${BLUE}${BOX_V}${NC}\n" "Interface" "IP Address" "MAC Address" "Status"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 网络接口信息
+    # Network interface information
     ip -o addr show | grep -v "lo" | grep -v "docker" | grep -v "br-" | grep -v "veth" | while read line; do
         local interface=$(echo $line | awk '{print $2}')
         local ip=$(echo $line | awk '{print $4}')
         local mac=$(ip link show $interface | grep "link/ether" | awk '{print $2}')
         local status=$(ip link show $interface | grep -oP '(?<=state )[^ ]*')
         
-        printf "${BLUE}║${NC} ${WHITE}%-12s %-18s %-18s %-12s${NC} ${BLUE}║${NC}\n" "$interface" "$ip" "$mac" "$status"
+        printf "${BLUE}${BOX_V}${NC} ${WHITE}%-12s %-18s %-18s %-12s${NC} ${BLUE}${BOX_V}${NC}\n" "$interface" "$ip" "$mac" "$status"
     done
 }
 
-# 显示模块标题栏函数
+# Function to show module header
 show_module_header() {
     local title="$1"
     clear
     echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
     
-    # 使用printf居中显示标题
+    # Use printf to center the title
     local title_text="${BOLD}${CYAN}ServerMaster${NC} - ${YELLOW}$title${NC}"
     local title_length=${#title_text}
     local padding=$(( (65 - title_length) / 2 ))
     
-    printf "${BLUE}║${NC}%${padding}s%s%${padding}s${BLUE}║${NC}\n" "" "$title_text" ""
+    printf "${BLUE}${BOX_V}${NC}%${padding}s%s%${padding}s${BLUE}${BOX_V}${NC}\n" "" "$title_text" ""
     
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}${BOX_BL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
     echo ""
 }
 
-# 显示模块底部函数
+# Function to show module footer
 show_module_footer() {
     echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
     
-    # 使用printf居中显示提示信息
-    local footer_text="${YELLOW}按回车键返回上一级菜单...${NC}"
+    # Use printf to center the footer text
+    local footer_text="${YELLOW}Press Enter to return to the previous menu...${NC}"
     local footer_length=${#footer_text}
     local padding=$(( (65 - footer_length) / 2 ))
     
-    printf "${BLUE}║${NC}%${padding}s%s%${padding}s${BLUE}║${NC}\n" "" "$footer_text" ""
+    printf "${BLUE}${BOX_V}${NC}%${padding}s%s%${padding}s${BLUE}${BOX_V}${NC}\n" "" "$footer_text" ""
     
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}${BOX_BL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_BR}${NC}"
     read
 }
 
-# 主函数
+# Main function
 main() {
-    # 显示模块标题
-    show_module_header "系统信息"
+    # Show module header
+    show_module_header "System Information"
     
-    # 显示系统信息部分
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${CYAN}基本系统信息${NC}                                     ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Show system information section
+    echo -e "${BLUE}${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${CYAN}BASIC SYSTEM INFO${NC}                                  ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 获取系统信息
+    # Get system information
     get_system_info
     
-    # 显示IP地址信息部分
-    echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}网络连接信息${NC}                                     ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Show IP address information section
+    echo -e "\n${BLUE}${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${GREEN}NETWORK INFORMATION${NC}                               ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
-    # 获取IP地址信息
+    # Get IP address information
     get_ip_address
     
-    # 尝试获取地理位置信息
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC}                      ${BOLD}${GREEN}地理位置信息${NC}                                     ${BLUE}║${NC}"
-    echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════════════╣${NC}"
+    # Try to get geolocation information
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
+    echo -e "${BLUE}${BOX_V}${NC}                      ${BOLD}${GREEN}GEOLOCATION INFO${NC}                                  ${BLUE}${BOX_V}${NC}"
+    echo -e "${BLUE}${BOX_VL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VR}${NC}"
     
     ip_info=$(curl -s --connect-timeout 5 ipinfo.io 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$ip_info" ]; then
@@ -239,18 +256,18 @@ main() {
         city=$(echo "$ip_info" | grep -oP '"city": "\K[^"]+' 2>/dev/null)
         isp=$(echo "$ip_info" | grep -oP '"org": "\K[^"]+' 2>/dev/null)
         
-        print_info "国家/地区" "${country:-未知}"
-        print_info "省份/城市" "${region:-未知}/${city:-未知}"
-        print_info "运营商" "${isp:-未知}"
+        print_info "Country/Region" "${country:-Unknown}"
+        print_info "Province/City" "${region:-Unknown}/${city:-Unknown}"
+        print_info "ISP" "${isp:-Unknown}"
     else
-        printf "${BLUE}║${NC} ${RED}%-65s${NC} ${BLUE}║${NC}\n" "无法获取地理位置信息，请检查网络连接"
+        printf "${BLUE}${BOX_V}${NC} ${RED}%-65s${NC} ${BLUE}${BOX_V}${NC}\n" "Unable to get geolocation info, please check network connection"
     fi
     
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}${BOX_BL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_BR}${NC}"
     
-    # 显示模块底部
+    # Show module footer
     show_module_footer
 }
 
-# 执行主函数
+# Execute main function
 main "$@"
