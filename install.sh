@@ -22,12 +22,20 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
+# 日志函数
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
+    dialog --title "安装日志" --infobox "$message" 5 60
+}
+
 # 确保 Dialog 已安装
 ensure_dialog() {
+    log "INFO" "检查 Dialog 安装状态"
     if ! command -v dialog &> /dev/null; then
-        dialog --title "安装 Dialog" --infobox "正在安装 Dialog..." 5 40
-        sleep 1
-        
+        log "INFO" "正在安装 Dialog..."
         if command -v apt &> /dev/null; then
             apt update && apt install -y dialog
         elif command -v yum &> /dev/null; then
@@ -35,14 +43,19 @@ ensure_dialog() {
         elif command -v apk &> /dev/null; then
             apk add dialog
         else
+            log "ERROR" "无法安装 Dialog，请手动安装。"
             dialog --title "错误" --msgbox "无法安装 Dialog，请手动安装。" 8 40
             exit 1
         fi
+        log "SUCCESS" "Dialog 安装完成"
+    else
+        log "INFO" "Dialog 已安装"
     fi
 }
 
 # 检查系统要求
 check_system() {
+    log "INFO" "检查系统要求"
     dialog --title "系统检查" --infobox "正在检查系统要求..." 5 40
     sleep 1
     
@@ -57,6 +70,7 @@ check_system() {
     done
     
     if [ ! -z "$missing_tools" ]; then
+        log "INFO" "正在安装必要的工具: $missing_tools"
         dialog --title "安装依赖" --infobox "正在安装必要的工具..." 5 40
         sleep 1
         
@@ -70,11 +84,15 @@ check_system() {
             dialog --title "错误" --msgbox "无法安装必要的工具，请手动安装。" 8 40
             exit 1
         fi
+        log "SUCCESS" "必要工具安装完成"
+    else
+        log "INFO" "所有必要工具已安装"
     fi
 }
 
 # 创建必要的目录
 create_directories() {
+    log "INFO" "创建必要的目录"
     dialog --title "创建目录" --infobox "正在创建必要的目录..." 5 40
     sleep 1
     
@@ -83,23 +101,28 @@ create_directories() {
     mkdir -p "$CONFIG_DIR"
     mkdir -p "$LOGS_DIR"
     mkdir -p "$TEMP_DIR"
+    log "SUCCESS" "目录创建完成"
 }
 
 # 检查网络连接
 check_connectivity() {
+    log "INFO" "检查网络连接"
     dialog --title "网络检查" --infobox "正在检查网络连接..." 5 40
     sleep 1
     
     if ! curl -s "$CF_PROXY_URL" &> /dev/null && \
        ! curl -s "$GITHUB_RAW" &> /dev/null && \
        ! curl -s "${MIRROR_URL}${GITHUB_RAW}" &> /dev/null; then
+        log "ERROR" "无法连接到服务器，请检查网络连接。"
         dialog --title "错误" --msgbox "无法连接到服务器，请检查网络连接。" 8 40
         exit 1
     fi
+    log "SUCCESS" "网络连接正常"
 }
 
 # 下载主脚本
 download_main_script() {
+    log "INFO" "下载主脚本"
     dialog --title "下载主脚本" --infobox "正在下载主脚本..." 5 40
     sleep 1
     
@@ -107,7 +130,9 @@ download_main_script() {
        curl -s -o "$INSTALL_DIR/main.sh" "$GITHUB_RAW/main.sh" || \
        curl -s -o "$INSTALL_DIR/main.sh" "${MIRROR_URL}${GITHUB_RAW}/main.sh"; then
         chmod +x "$INSTALL_DIR/main.sh"
+        log "SUCCESS" "主脚本下载完成"
     else
+        log "ERROR" "无法下载主脚本"
         dialog --title "错误" --msgbox "无法下载主脚本。" 8 40
         exit 1
     fi
@@ -115,6 +140,7 @@ download_main_script() {
 
 # 下载模块
 download_modules() {
+    log "INFO" "下载系统模块"
     dialog --title "下载模块" --infobox "正在下载系统模块..." 5 40
     sleep 1
     
@@ -122,7 +148,9 @@ download_modules() {
        curl -s -o "$TEMP_DIR/modules.tar.gz" "$GITHUB_RAW/modules.tar.gz" || \
        curl -s -o "$TEMP_DIR/modules.tar.gz" "${MIRROR_URL}${GITHUB_RAW}/modules.tar.gz"; then
         tar -xzf "$TEMP_DIR/modules.tar.gz" -C "$INSTALL_DIR"
+        log "SUCCESS" "系统模块下载完成"
     else
+        log "ERROR" "无法下载系统模块"
         dialog --title "错误" --msgbox "无法下载系统模块。" 8 40
         exit 1
     fi
@@ -130,16 +158,21 @@ download_modules() {
 
 # 创建命令链接
 create_command() {
+    log "INFO" "创建系统命令"
     dialog --title "创建命令" --infobox "正在创建系统命令..." 5 40
     sleep 1
     
     ln -sf "$INSTALL_DIR/main.sh" /usr/local/bin/sm
     chmod +x /usr/local/bin/sm
+    log "SUCCESS" "系统命令创建完成"
 }
 
 # 完成安装
 finalize() {
-    dialog --title "安装完成" --msgbox "ServerMaster 安装完成！\n\n您可以使用 'sm' 命令启动系统。" 8 40
+    log "SUCCESS" "ServerMaster 安装完成"
+    dialog --title "安装完成" --msgbox "ServerMaster 安装完成！\n\n正在启动系统..." 8 40
+    clear
+    exec "$INSTALL_DIR/main.sh"
 }
 
 # 显示安装步骤

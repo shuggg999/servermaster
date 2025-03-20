@@ -51,9 +51,26 @@ check_updates() {
             dialog --title "更新中" --infobox "正在准备更新..." 5 40
             sleep 1
             
+            # 备份配置
+            if [ -d "$CONFIG_DIR" ]; then
+                cp -r "$CONFIG_DIR" "/tmp/servermaster_config_backup"
+            fi
+            
+            # 执行更新
             bash <(curl -sL "$CF_PROXY_URL/install.sh" || 
                   curl -sL "$GITHUB_REPO/raw/main/install.sh" || 
                   curl -sL "${MIRROR_URL}${GITHUB_REPO}/raw/main/install.sh")
+            
+            # 恢复配置
+            if [ -d "/tmp/servermaster_config_backup" ]; then
+                cp -r "/tmp/servermaster_config_backup"/* "$CONFIG_DIR/"
+            fi
+            
+            # 更新版本号
+            echo -n "$latest_version" > "$INSTALL_DIR/version.txt"
+            
+            # 重启主程序
+            exec "$INSTALL_DIR/main.sh"
             exit 0
         fi
     else
