@@ -71,7 +71,7 @@ check_system() {
     fi
     
     # Check required tools
-    local required_tools=("curl" "wget" "tar" "gzip")
+    local required_tools=("curl" "wget" "tar" "gzip" "dialog")
     local missing_tools=()
     
     for tool in "${required_tools[@]}"; do
@@ -87,13 +87,13 @@ check_system() {
         if [ -f /etc/debian_version ]; then
             echo -e "    ${CYAN}   - 使用 apt 安装工具...${NC}"
             apt update -y > /dev/null 2>&1
-            apt install -y curl wget tar gzip > /dev/null 2>&1
+            apt install -y curl wget tar gzip dialog > /dev/null 2>&1
         elif [ -f /etc/redhat-release ]; then
             echo -e "    ${CYAN}   - 使用 yum 安装工具...${NC}"
-            yum install -y curl wget tar gzip > /dev/null 2>&1
+            yum install -y curl wget tar gzip dialog > /dev/null 2>&1
         elif [ -f /etc/alpine-release ]; then
             echo -e "    ${CYAN}   - 使用 apk 安装工具...${NC}"
-            apk add curl wget tar gzip > /dev/null 2>&1
+            apk add curl wget tar gzip dialog > /dev/null 2>&1
         else
             echo -e "    ${RED}✗${NC} 无法在当前系统上安装必要工具!"
             exit 1
