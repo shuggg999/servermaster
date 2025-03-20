@@ -38,11 +38,29 @@ check_modules() {
 # 检查更新
 check_updates() {
     dialog --title "检查更新" --infobox "正在检查更新..." 5 40
+    sleep 1
     
-    local latest_version=$(curl -s "$CF_PROXY_URL/version.txt" || 
-                          curl -s "$GITHUB_RAW/version.txt" || 
-                          curl -s "${MIRROR_URL}${GITHUB_RAW}/version.txt" || 
-                          echo "$VERSION")
+    # 获取当前版本和最新版本
+    if [ -f "$INSTALL_DIR/version.txt" ]; then
+        VERSION=$(cat "$INSTALL_DIR/version.txt")
+    fi
+    
+    local latest_version=""
+    
+    # 尝试从不同源获取最新版本
+    if latest_version=$(curl -s --connect-timeout 5 "$CF_PROXY_URL/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
+        dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+    elif latest_version=$(curl -s --connect-timeout 5 "$GITHUB_RAW/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
+        dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+    elif latest_version=$(curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
+        dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+    else
+        dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" 6 50
+        return
+    fi
+    
+    # 清理版本号，确保只包含有效字符
+    latest_version=$(echo "$latest_version" | tr -cd '0-9\.\n')
     
     if [ "$VERSION" != "$latest_version" ]; then
         dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" 8 60
@@ -56,21 +74,45 @@ check_updates() {
                 cp -r "$CONFIG_DIR" "/tmp/servermaster_config_backup"
             fi
             
-            # 执行更新
-            bash <(curl -sL "$CF_PROXY_URL/install.sh" || 
-                  curl -sL "$GITHUB_REPO/raw/main/install.sh" || 
-                  curl -sL "${MIRROR_URL}${GITHUB_REPO}/raw/main/install.sh")
+            # 更新版本号到临时文件，以便安装脚本可以读取
+            echo -n "$latest_version" > "/tmp/servermaster_new_version"
             
-            # 恢复配置
-            if [ -d "/tmp/servermaster_config_backup" ]; then
-                cp -r "/tmp/servermaster_config_backup"/* "$CONFIG_DIR/"
+            # 执行更新安装脚本
+            local update_cmd=""
+            if curl -s --connect-timeout 5 "$CF_PROXY_URL/install.sh" > "/tmp/servermaster_install.sh" 2>/dev/null; then
+                update_cmd="/tmp/servermaster_install.sh"
+            elif curl -s --connect-timeout 5 "$GITHUB_RAW/install.sh" > "/tmp/servermaster_install.sh" 2>/dev/null; then
+                update_cmd="/tmp/servermaster_install.sh"
+            elif curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/install.sh" > "/tmp/servermaster_install.sh" 2>/dev/null; then
+                update_cmd="/tmp/servermaster_install.sh"
+            else
+                dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" 6 40
+                return
             fi
             
-            # 更新版本号
-            echo -n "$latest_version" > "$INSTALL_DIR/version.txt"
+            # 设置可执行权限
+            chmod +x "$update_cmd"
             
-            # 重启主程序
-            exec "$INSTALL_DIR/main.sh"
+            # 显示更新日志
+            dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" 10 50
+            
+            # 恢复配置（如果更新成功）
+            echo '
+            # 在安装完成后恢复配置和更新版本号
+            if [ -d "/tmp/servermaster_config_backup" ] && [ -d "$INSTALL_DIR/config" ]; then
+                cp -r /tmp/servermaster_config_backup/* $INSTALL_DIR/config/
+                rm -rf /tmp/servermaster_config_backup
+            fi
+            
+            # 确保设置正确的版本号
+            if [ -f "/tmp/servermaster_new_version" ]; then
+                cat /tmp/servermaster_new_version > $INSTALL_DIR/version.txt
+                rm -f /tmp/servermaster_new_version
+            fi
+            ' >> "$update_cmd"
+            
+            # 执行更新
+            exec bash "$update_cmd"
             exit 0
         fi
     else
@@ -78,12 +120,43 @@ check_updates() {
     fi
 }
 
+# 卸载系统
+uninstall_system() {
+    dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" 12 60
+    
+    if [ $? -eq 0 ]; then
+        dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" 8 50
+        
+        if [ $? -eq 0 ]; then
+            dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." 5 40
+            sleep 1
+            
+            # 删除命令链接
+            rm -f /usr/local/bin/sm
+            
+            # 删除主目录
+            rm -rf "$INSTALL_DIR"
+            
+            # 删除临时文件
+            rm -rf "/tmp/servermaster"
+            rm -rf "/tmp/servermaster_*"
+            
+            dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" 6 40
+            clear
+            exit 0
+        fi
+    fi
+    
+    # 用户取消卸载，返回主菜单
+    return
+}
+
 # 显示主菜单
 show_main_menu() {
     while true; do
         choice=$(dialog --title "ServerMaster 主菜单" \
                        --backtitle "ServerMaster v$VERSION" \
-                       --menu "请选择要执行的操作：" 15 60 8 \
+                       --menu "请选择要执行的操作：" 15 60 9 \
                        "1" "系统信息" \
                        "2" "系统更新" \
                        "3" "系统清理" \
@@ -91,7 +164,8 @@ show_main_menu() {
                        "5" "Docker管理" \
                        "6" "工作区管理" \
                        "7" "脚本更新" \
-                       "8" "退出系统" \
+                       "8" "卸载系统" \
+                       "9" "退出系统" \
                        3>&1 1>&2 2>&3)
         
         exit_status=$?
@@ -129,6 +203,9 @@ show_main_menu() {
                 check_updates 
                 ;;
             8) 
+                uninstall_system
+                ;;
+            9) 
                 dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
                 if [ $? -eq 0 ]; then
                     break
