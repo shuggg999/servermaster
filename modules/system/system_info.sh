@@ -3,18 +3,8 @@
 # System Information Module
 # This module displays system information using Dialog
 
-# 定义漂亮的boxdraw字符
-BOX_H="═"
-BOX_V="║"
-BOX_TL="╔"
-BOX_TR="╗"
-BOX_BL="╚"
-BOX_BR="╝"
-BOX_VR="╠"
-BOX_VL="╣"
-BOX_HU="╩"
-BOX_HD="╦"
-BOX_HV="╬"
+# 定义简单的分隔线字符
+SEP_LINE="----------------------------------------"
 
 # Get system information
 get_system_info() {
@@ -52,60 +42,57 @@ get_system_info() {
     local ipv4=$(curl -s ifconfig.me)
     local dns=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
     
-    # 格式化输出，使用美观的方框和颜色
+    # 格式化输出，使用简洁的格式
     local info_text=""
-    info_text+="${BOX_TL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_TR}\n"
-    info_text+="${BOX_V}${TITLE}                       系统信息概览                         ${RESET}${BOX_V}\n"
-    info_text+="${BOX_VR}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VL}\n"
+    info_text+="${TITLE}系统信息概览${RESET}\n"
+    info_text+="$SEP_LINE\n\n"
     
     # 系统信息部分
-    info_text+="${BOX_V} ${LABEL}主机名${RESET}    : ${VALUE}$hostname${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}操作系统${RESET}  : ${VALUE}$os_info${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}内核版本${RESET}  : ${VALUE}$kernel${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}运行时间${RESET}  : ${VALUE}$uptime${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}系统负载${RESET}  : ${VALUE}$load_avg${RESET}${BOX_V}\n"
+    info_text+="${LABEL}主机名${RESET}    : ${VALUE}$hostname${RESET}\n"
+    info_text+="${LABEL}操作系统${RESET}  : ${VALUE}$os_info${RESET}\n"
+    info_text+="${LABEL}内核版本${RESET}  : ${VALUE}$kernel${RESET}\n"
+    info_text+="${LABEL}运行时间${RESET}  : ${VALUE}$uptime${RESET}\n"
+    info_text+="${LABEL}系统负载${RESET}  : ${VALUE}$load_avg${RESET}\n\n"
     
-    info_text+="${BOX_VR}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VL}\n"
+    info_text+="$SEP_LINE\n"
     
     # CPU信息部分
-    info_text+="${BOX_V} ${TITLE}CPU信息:${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}CPU型号${RESET}   : ${VALUE}$cpu_model${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}CPU核心数${RESET} : ${VALUE}$cpu_cores${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}CPU频率${RESET}   : ${VALUE}$cpu_freq MHz${RESET}${BOX_V}\n"
+    info_text+="${TITLE}CPU信息:${RESET}\n"
+    info_text+="${LABEL}CPU型号${RESET}   : ${VALUE}$cpu_model${RESET}\n"
+    info_text+="${LABEL}CPU核心数${RESET} : ${VALUE}$cpu_cores${RESET}\n"
+    info_text+="${LABEL}CPU频率${RESET}   : ${VALUE}$cpu_freq MHz${RESET}\n\n"
     
-    info_text+="${BOX_VR}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VL}\n"
+    info_text+="$SEP_LINE\n"
     
     # 内存信息部分
-    info_text+="${BOX_V} ${TITLE}内存信息:${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}总内存${RESET}    : ${VALUE}$total_mem${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}已用内存${RESET}  : ${VALUE}$used_mem${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}空闲内存${RESET}  : ${VALUE}$free_mem${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}交换空间${RESET}  : ${VALUE}$swap_total (已用: $swap_used)${RESET}${BOX_V}\n"
+    info_text+="${TITLE}内存信息:${RESET}\n"
+    info_text+="${LABEL}总内存${RESET}    : ${VALUE}$total_mem${RESET}\n"
+    info_text+="${LABEL}已用内存${RESET}  : ${VALUE}$used_mem${RESET}\n"
+    info_text+="${LABEL}空闲内存${RESET}  : ${VALUE}$free_mem${RESET}\n"
+    info_text+="${LABEL}交换空间${RESET}  : ${VALUE}$swap_total (已用: $swap_used)${RESET}\n\n"
     
-    info_text+="${BOX_VR}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VL}\n"
+    info_text+="$SEP_LINE\n"
     
     # 磁盘信息部分
-    info_text+="${BOX_V} ${TITLE}磁盘信息:${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}总空间${RESET}    : ${VALUE}$disk_total${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}已用空间${RESET}  : ${VALUE}$disk_used${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}使用率${RESET}    : ${VALUE}$disk_usage${RESET}${BOX_V}\n"
+    info_text+="${TITLE}磁盘信息:${RESET}\n"
+    info_text+="${LABEL}总空间${RESET}    : ${VALUE}$disk_total${RESET}\n"
+    info_text+="${LABEL}已用空间${RESET}  : ${VALUE}$disk_used${RESET}\n"
+    info_text+="${LABEL}使用率${RESET}    : ${VALUE}$disk_usage${RESET}\n\n"
     
-    info_text+="${BOX_VR}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_VL}\n"
+    info_text+="$SEP_LINE\n"
     
     # 网络信息部分
-    info_text+="${BOX_V} ${TITLE}网络信息:${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}公网IPv4${RESET}  : ${VALUE}$ipv4${RESET}${BOX_V}\n"
-    info_text+="${BOX_V} ${LABEL}DNS服务器${RESET} : ${VALUE}$dns${RESET}${BOX_V}\n"
+    info_text+="${TITLE}网络信息:${RESET}\n"
+    info_text+="${LABEL}公网IPv4${RESET}  : ${VALUE}$ipv4${RESET}\n"
+    info_text+="${LABEL}DNS服务器${RESET} : ${VALUE}$dns${RESET}\n"
     
-    info_text+="${BOX_BL}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_BR}\n"
-    
-    # Display info using dialog with colors enabled
+    # Display info using dialog with colors enabled - 使用固定尺寸
     dialog --title "系统信息" \
            --colors \
-           --msgbox "$info_text" 35 70
+           --msgbox "$info_text" 28 70
 }
 
-# 添加交互式菜单
+# 添加交互式菜单 - 使用固定尺寸
 show_menu() {
     local choice=$(dialog --clear \
                   --title "系统信息" \
@@ -170,15 +157,19 @@ show_menu() {
             local disk_info=$(df -h | grep -v "tmpfs\|udev")
             dialog --title "磁盘使用情况" \
                    --colors \
-                   --msgbox "$disk_info" 20 70
+                   --msgbox "$disk_info" 18 70
             show_menu
             ;;
         "5")
             # 显示网络连接
-            local connections=$(netstat -tulpn | grep LISTEN | head -10)
+            local connections=$(netstat -tulpn 2>/dev/null | grep LISTEN | head -10)
+            # 如果netstat命令不可用，尝试ss命令
+            if [ -z "$connections" ]; then
+                connections=$(ss -tulpn | grep LISTEN | head -10)
+            fi
             dialog --title "网络连接" \
                    --colors \
-                   --msgbox "当前监听的网络连接:\n\n$connections" 20 70
+                   --msgbox "当前监听的网络连接:\n\n$connections" 18 70
             show_menu
             ;;
         "6"|"")

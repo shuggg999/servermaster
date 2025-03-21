@@ -441,19 +441,14 @@ show_text_menu() {
 show_main_menu() {
     log_debug "显示Dialog模式菜单"
 
-    # 获取窗口尺寸
-    local window_size=($(get_window_size))
-    local win_height=${window_size[0]}
-    local win_width=${window_size[1]}
-    
-    # 确保足够的空间来显示所有菜单项
-    [ $win_height -lt 25 ] && win_height=25
-    [ $win_width -lt 75 ] && win_width=75
+    # 使用固定窗口大小
+    local win_height=18
+    local win_width=70
     
     # 调试窗口大小
     log_debug "菜单窗口大小: ${win_height}x${win_width}"
     
-    # 检查Dialog是否可用，禁用文本模式强制使用dialog进行调试
+    # 检查Dialog是否可用
     if ! command -v dialog &> /dev/null; then
         log_error "Dialog未安装，请先安装Dialog"
         echo "错误: Dialog未安装，请先安装Dialog"
@@ -476,15 +471,14 @@ show_main_menu() {
     
     # 设置菜单标题和菜单项
     local menu_title="ServerMaster 主菜单 (v$VERSION)"
-    local menu_subtitle="\n      ╔══════════ 系统管理 ══════════╗    ╔══════════ 网络与应用 ══════════╗\n      ║                            ║    ║                                ║\n      ╚════════════════════════════╝    ╚════════════════════════════════╝\n\n请使用↑↓方向键选择操作，按Enter键确认:"
     
-    # 使用简化的菜单参数
-    local menu_height=18
-    local menu_width=75
+    # 使用菜单参数
+    local menu_height=$win_height
+    local menu_width=$win_width
     local menu_items=9
     
     while true; do
-        # 创建单个菜单，使用美观的布局
+        # 创建单个菜单，使用简洁的布局
         echo "准备显示主菜单..." >> "$debug_log"
         
         # 使用临时文件存储菜单输出
@@ -492,19 +486,19 @@ show_main_menu() {
         
         export DIALOGRC=/dev/null  # 避免配置文件影响
         
-        # 使用更简单的菜单格式
+        # 使用更简单的菜单格式 - 顶部添加分隔线
         dialog --clear --no-cancel \
                --title "$menu_title" \
                --backtitle "ServerMaster v$VERSION" \
-               --menu "请选择一个选项:" $menu_height $menu_width $menu_items \
-               "1" "系统信息" \
-               "2" "系统更新" \
-               "3" "系统清理" \
-               "4" "BBR管理" \
-               "5" "Docker管理" \
-               "6" "工作区管理" \
-               "7" "检查更新" \
-               "8" "卸载系统" \
+               --menu "\n系统管理                        网络与应用\n----------------------------------------\n请选择一个选项:" $menu_height $menu_width $menu_items \
+               "1" "系统信息 - 查看服务器详细信息" \
+               "2" "系统更新 - 更新系统软件包" \
+               "3" "系统清理 - 清理系统临时文件" \
+               "4" "BBR管理 - TCP加速管理" \
+               "5" "Docker管理 - 容器应用管理" \
+               "6" "工作区管理 - 管理工作区" \
+               "7" "检查更新 - 检查脚本更新" \
+               "8" "卸载系统 - 卸载ServerMaster" \
                "0" "退出系统" 2>"$tmp_file"
         
         # 获取返回状态
@@ -620,13 +614,13 @@ main() {
     # 检查模块
     check_modules
     
-    # 获取窗口尺寸
-    local window_size=($(get_window_size))
+    # 获取窗口尺寸 - 固定大小
+    local window_size=(20 70)
     
     # 欢迎界面
     if [ "$USE_TEXT_MODE" = false ]; then
         dialog --title "ServerMaster" \
-               --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" ${window_size[0]} ${window_size[1]}
+               --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" 12 50
     else
         clear
         echo "====================================================="
@@ -642,56 +636,21 @@ main() {
     check_updates
     log_debug "检查更新完成，准备显示主菜单..."
     
-    # 测试简单的对话框，排除复杂菜单可能存在的问题
+    # 显示主菜单
     if [ "$USE_TEXT_MODE" = false ]; then
         # 创建调试日志目录和文件
         mkdir -p "$INSTALL_DIR/logs"
         debug_log="$INSTALL_DIR/logs/main_debug.log"
         echo "====== 主函数调试信息 $(date) ======" > "$debug_log"
-        
-        # 获取Dialog版本信息
-        dialog_version=$(dialog --version 2>&1 | head -n 1)
-        echo "Dialog版本: $dialog_version" >> "$debug_log"
-        echo "终端大小: $(tput lines)x$(tput cols)" >> "$debug_log"
-        echo "修改后的窗口大小: ${window_size[0]}x${window_size[1]}" >> "$debug_log"
-        
-        # 测试一个简单的Dialog菜单
-        echo "测试简单Dialog菜单..." >> "$debug_log"
-        
-        simple_choice=$(dialog --title "测试菜单" \
-                              --backtitle "ServerMaster 测试" \
-                              --menu "请选择一个选项:" 15 40 3 \
-                              "1" "系统信息" \
-                              "2" "系统更新" \
-                              "0" "退出" 3>&1 1>&2 2>&3)
-        simple_status=$?
-        
-        echo "简单菜单结果: choice='$simple_choice', 状态=$simple_status" >> "$debug_log"
-        
-        if [ $simple_status -eq 0 ]; then
-            case $simple_choice in
-                1) dialog --title "选择了系统信息" --msgbox "您选择了系统信息选项" 8 40 ;;
-                2) dialog --title "选择了系统更新" --msgbox "您选择了系统更新选项" 8 40 ;;
-                0) dialog --title "选择了退出" --msgbox "您选择了退出选项" 8 40 ;;
-            esac
-            
-            # 测试成功，显示正常菜单
-            echo "简单菜单测试成功，显示正常菜单..." >> "$debug_log"
-            show_main_menu
-        else
-            # 简单菜单也失败，提示并切换到文本模式
-            dialog --title "Dialog错误" --msgbox "Dialog菜单显示出现问题，切换到文本模式..." 8 40
-            echo "简单菜单测试失败，切换到文本模式" >> "$debug_log"
-            USE_TEXT_MODE=true
-            show_text_menu
-        fi
+        echo "准备显示主菜单..." >> "$debug_log"
+        show_main_menu
     else
         show_text_menu
     fi
     
     # 退出时的消息
     if [ "$USE_TEXT_MODE" = false ]; then
-        dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" ${window_size[0]} ${window_size[1]}
+        dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" 8 40
     fi
     clear
     
