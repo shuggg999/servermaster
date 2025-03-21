@@ -3,26 +3,6 @@
 # ServerMaster Installation Script
 # This script installs the ServerMaster system
 
-# 检测是否通过管道运行
-# is_piped() {
-#     [ -p /dev/stdin ]
-# }
-
-# # 如果是通过管道运行，先将脚本内容保存到临时文件再执行
-# if is_piped; then
-#     temp_script=$(mktemp /tmp/servermaster_install_XXXXXX.sh)
-#     cat > "$temp_script"
-#     chmod +x "$temp_script"
-#     exec bash "$temp_script"
-#     exit $?
-# fi
-
-# 检查 Dialog 是否已安装
-if ! command -v dialog &> /dev/null; then
-    echo "错误: Dialog 未安装，请先安装 Dialog。"
-    exit 1
-fi
-
 # 安装路径
 INSTALL_DIR="/usr/local/servermaster"
 MODULES_DIR="$INSTALL_DIR/modules"
@@ -36,6 +16,9 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
+# 文本模式 - 无需Dialog
+USE_TEXT_MODE=true
+
 # 日志函数
 log() {
     local level="$1"
@@ -47,60 +30,16 @@ log() {
     
     # 写入日志文件
     echo -e "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
-}
-
-# 在文件顶部添加一个新的函数用于显示实时日志
-# 在一个对话框中显示安装日志
-show_progress() {
-    local log_file="$LOGS_DIR/install.log"
-    local fifo_file="/tmp/servermaster_install_fifo"
     
-    # 确保日志目录存在
-    mkdir -p "$LOGS_DIR"
-    
-    # 清空日志文件
-    : > "$log_file"
-    
-    # 创建FIFO
-    rm -f "$fifo_file"
-    mkfifo "$fifo_file"
-    
-    # 获取窗口尺寸
-    local term_height=$(tput lines)
-    local term_width=$(tput cols)
-    local win_height=$((term_height * 80 / 100))
-    local win_width=$((term_width * 80 / 100))
-    [ $win_height -lt 20 ] && win_height=20
-    [ $win_width -lt 70 ] && win_width=70
-    
-    # 启动dialog显示日志内容
-    dialog --title "ServerMaster 安装进度" \
-           --begin 2 2 \
-           --tailboxbg "$fifo_file" $((win_height-5)) $((win_width-10)) \
-           --and-widget \
-           --begin $((win_height-3)) 2 \
-           --infobox "安装中，请稍候..." 3 $((win_width-10)) &
-    
-    dialog_pid=$!
-    
-    # 添加初始内容到FIFO，防止file pointer错误
-    echo "正在初始化安装程序..." > "$fifo_file" &
-    
-    # 启动后台进程，从日志文件更新到FIFO
-    (
-        while true; do
-            if [ -f "$log_file" ]; then
-                # 使用cat而不是直接重定向，避免文件指针错误
-                cat "$log_file" > "$fifo_file" 2>/dev/null || true
-                sleep 1
-            fi
-        done
-    ) &
-    
-    tail_pid=$!
-    
-    # 返回FIFO路径，供日志函数使用
-    echo "$fifo_file"
+    # 文本模式下直接输出到控制台
+    if [ "$USE_TEXT_MODE" = true ]; then
+        case "$level" in
+            "INFO")     echo -e "[\033[34mINFO\033[0m] $message" ;;
+            "SUCCESS")  echo -e "[\033[32mSUCCESS\033[0m] $message" ;;
+            "ERROR")    echo -e "[\033[31mERROR\033[0m] $message" ;;
+            *)          echo -e "[$level] $message" ;;
+        esac
+    fi
 }
 
 # 执行命令并记录日志
@@ -114,33 +53,11 @@ execute_cmd() {
     # 执行命令并捕获输出
     local output
     if output=$(eval "$cmd" 2>&1); then
-        log "SUCCESS" "$success_msg\n$output"
+        log "SUCCESS" "$success_msg"
         return 0
     else
-        log "ERROR" "$error_msg\n$output"
+        log "ERROR" "$error_msg: $output"
         return 1
-    fi
-}
-
-# 确保 Dialog 已安装
-ensure_dialog() {
-    log "INFO" "检查 Dialog 安装状态"
-    if ! command -v dialog &> /dev/null; then
-        log "INFO" "正在安装 Dialog..."
-        if command -v apt &> /dev/null; then
-            apt update && apt install -y dialog
-        elif command -v yum &> /dev/null; then
-            yum install -y dialog
-        elif command -v apk &> /dev/null; then
-            apk add dialog
-        else
-            log "ERROR" "无法安装 Dialog，请手动安装。"
-            dialog --title "错误" --msgbox "无法安装 Dialog，请手动安装。" 8 40
-            exit 1
-        fi
-        log "SUCCESS" "Dialog 安装完成"
-    else
-        log "INFO" "Dialog 已安装"
     fi
 }
 
@@ -231,8 +148,7 @@ check_connectivity() {
     fi
     
     if [ "$connected" = false ]; then
-        log "ERROR" "无法连接到任何服务器，请检查网络连接"
-        dialog --title "网络错误" --msgbox "连接错误: $output" 8 60
+        log "ERROR" "无法连接到任何服务器，请检查网络连接: $output"
         exit 1
     fi
 }
@@ -292,7 +208,6 @@ download_main_script() {
     
     if [ "$download_success" = false ]; then
         log "ERROR" "所有下载源均无法下载主脚本: $output"
-        dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
         exit 1
     fi
 }
@@ -353,7 +268,6 @@ download_modules() {
     
     if [ "$download_success" = false ]; then
         log "ERROR" "所有下载源均无法下载系统模块: $output"
-        dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
         exit 1
     fi
 }
@@ -399,20 +313,29 @@ finalize() {
     # 设置权限
     chmod -R 755 "$INSTALL_DIR"
     
-    dialog --title "安装完成" --msgbox "ServerMaster 安装完成！\n\n当前版本: $(cat $INSTALL_DIR/version.txt)\n\n正在启动系统..." 10 50
-    clear
-    exec "$INSTALL_DIR/main.sh"
+    log "SUCCESS" "ServerMaster 安装完成！当前版本: $(cat $INSTALL_DIR/version.txt)"
+    log "SUCCESS" "您可以通过执行 'sm' 命令启动系统"
+    
+    echo ""
+    echo "====================================================="
+    echo "  ServerMaster 安装完成！"
+    echo "  当前版本: $(cat $INSTALL_DIR/version.txt)"
+    echo "  运行命令: sm"
+    echo "====================================================="
+    echo ""
 }
 
 # 主函数
 main() {
-    # 启动进度显示
-    FIFO_FILE=$(show_progress)
+    clear
+    echo "====================================================="
+    echo "          ServerMaster 安装程序启动                  "
+    echo "====================================================="
+    echo ""
     
     # 记录欢迎消息
     log "INFO" "欢迎使用 ServerMaster 安装向导！"
     log "INFO" "正在准备安装..."
-    sleep 1
     
     # 显示安装步骤
     log "INFO" "安装将执行以下步骤:"
@@ -423,10 +346,9 @@ main() {
     log "INFO" "5. 下载系统模块"
     log "INFO" "6. 创建系统命令"
     log "INFO" "7. 完成安装"
-    sleep 1
+    echo ""
     
     # 执行安装步骤
-    ensure_dialog
     check_system
     create_directories
     check_connectivity
@@ -435,15 +357,6 @@ main() {
     create_command
     
     # 完成安装
-    log "SUCCESS" "ServerMaster 安装完成！"
-    sleep 2
-    
-    # 关闭进度监控
-    kill $tail_pid 2>/dev/null
-    kill $dialog_pid 2>/dev/null
-    rm -f "$FIFO_FILE"
-    
-    # 运行完成函数
     finalize
 }
 
