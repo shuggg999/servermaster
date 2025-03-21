@@ -3,16 +3,46 @@
 # ServerMaster Main Script
 # This script serves as the main entry point for the ServerMaster system
 
+# 开启调试模式，帮助排查问题
+# DEBUG=true
+DEBUG=false
+
+# 文本模式标志，当Dialog不可用时使用
+USE_TEXT_MODE=false
+
+# 日志函数
+log_debug() {
+    if [ "$DEBUG" = true ]; then
+        echo "[DEBUG] $1" >&2
+    fi
+}
+
+# 打印错误信息
+log_error() {
+    echo -e "\033[31m[ERROR]\033[0m $1" >&2
+}
+
+# 打印成功信息
+log_success() {
+    echo -e "\033[32m[SUCCESS]\033[0m $1" >&2
+}
+
+log_debug "脚本开始执行"
+
 # 检查 Dialog 是否已安装
 if ! command -v dialog &> /dev/null; then
-    echo "错误: Dialog 未安装，请重新运行安装脚本。"
-    exit 1
+    echo "警告: Dialog 未安装，使用文本模式。"
+    export USE_TEXT_MODE=true
 fi
+
+log_debug "Dialog检查完成: USE_TEXT_MODE=$USE_TEXT_MODE"
 
 # 安装路径
 INSTALL_DIR="/usr/local/servermaster"
 MODULES_DIR="$INSTALL_DIR/modules"
 CONFIG_DIR="$INSTALL_DIR/config"
+
+log_debug "设置目录: INSTALL_DIR=$INSTALL_DIR"
 
 # 获取版本号
 if [ -f "$INSTALL_DIR/version.txt" ]; then
@@ -20,6 +50,8 @@ if [ -f "$INSTALL_DIR/version.txt" ]; then
 else
     VERSION="1.0"
 fi
+
+log_debug "当前版本: $VERSION"
 
 # URLs
 GITHUB_REPO="https://github.com/shuggg999/servermaster"
@@ -30,8 +62,10 @@ CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 # 获取适合的窗口大小
 get_window_size() {
     # 获取终端大小
-    local term_height=$(tput lines)
-    local term_width=$(tput cols)
+    local term_height=$(tput lines 2>/dev/null || echo 24)
+    local term_width=$(tput cols 2>/dev/null || echo 80)
+    
+    log_debug "终端大小: $term_height x $term_width"
     
     # 默认使用80%的终端空间
     local win_height=$((term_height * 80 / 100))
@@ -41,25 +75,41 @@ get_window_size() {
     [ $win_height -lt 20 ] && win_height=20
     [ $win_width -lt 70 ] && win_width=70
     
+    log_debug "计算窗口大小: $win_height x $win_width"
+    
     echo "${win_height} ${win_width}"
 }
 
 # 检查模块目录是否存在
 check_modules() {
-    local window_size=($(get_window_size))
+    log_debug "检查模块目录"
     
     if [ ! -d "$MODULES_DIR" ]; then
-        dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" ${window_size[0]} ${window_size[1]}
+        log_error "模块目录不存在: $MODULES_DIR"
+        
+        if [ "$USE_TEXT_MODE" = false ]; then
+            local window_size=($(get_window_size))
+            dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" ${window_size[0]} ${window_size[1]}
+        else
+            echo "错误: 模块目录不存在，请重新安装系统！"
+        fi
         exit 1
     fi
+    
+    log_debug "模块目录检查通过"
 }
 
 # 检查更新
 check_updates() {
-    local window_size=($(get_window_size))
+    log_debug "开始检查更新"
     
-    dialog --title "检查更新" --infobox "正在检查更新..." 5 40
-    sleep 1
+    if [ "$USE_TEXT_MODE" = false ]; then
+        local window_size=($(get_window_size))
+        dialog --title "检查更新" --infobox "正在检查更新..." 5 40
+        sleep 1
+    else
+        echo "正在检查更新..."
+    fi
     
     # 获取当前版本和最新版本
     if [ -f "$INSTALL_DIR/version.txt" ]; then
@@ -70,13 +120,32 @@ check_updates() {
     
     # 尝试从不同源获取最新版本
     if latest_version=$(curl -s --connect-timeout 5 "$CF_PROXY_URL/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        else
+            echo "从 Cloudflare Workers 获取到最新版本: $latest_version"
+            echo "当前版本: $VERSION"
+        fi
     elif latest_version=$(curl -s --connect-timeout 5 "$GITHUB_RAW/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        else
+            echo "从 GitHub 直连获取到最新版本: $latest_version"
+            echo "当前版本: $VERSION"
+        fi
     elif latest_version=$(curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+        else
+            echo "从镜像站获取到最新版本: $latest_version"
+            echo "当前版本: $VERSION"
+        fi
     else
-        dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" ${window_size[0]} ${window_size[1]}
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" ${window_size[0]} ${window_size[1]}
+        else
+            echo "无法获取最新版本信息，请检查网络连接"
+        fi
         return
     fi
     
@@ -84,10 +153,28 @@ check_updates() {
     latest_version=$(echo "$latest_version" | tr -cd '0-9\.\n')
     
     if [ "$VERSION" != "$latest_version" ]; then
-        dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" ${window_size[0]} ${window_size[1]}
+        local do_update=0
         
-        if [ $? -eq 0 ]; then
-            dialog --title "更新中" --infobox "正在准备更新..." 5 40
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" ${window_size[0]} ${window_size[1]}
+            do_update=$?
+        else
+            echo "发现新版本 $latest_version，当前版本 $VERSION"
+            read -p "是否更新？(y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                do_update=0
+            else
+                do_update=1
+            fi
+        fi
+        
+        if [ $do_update -eq 0 ]; then
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "更新中" --infobox "正在准备更新..." 5 40
+            else
+                echo "正在准备更新..."
+            fi
             sleep 1
             
             # 备份配置
@@ -107,7 +194,11 @@ check_updates() {
             elif curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/install.sh" > "/tmp/servermaster_install.sh" 2>/dev/null; then
                 update_cmd="/tmp/servermaster_install.sh"
             else
-                dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" ${window_size[0]} ${window_size[1]}
+                if [ "$USE_TEXT_MODE" = false ]; then
+                    dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" ${window_size[0]} ${window_size[1]}
+                else
+                    echo "无法下载安装脚本，更新失败"
+                fi
                 return
             fi
             
@@ -115,7 +206,14 @@ check_updates() {
             chmod +x "$update_cmd"
             
             # 显示更新日志
-            dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" ${window_size[0]} ${window_size[1]}
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" ${window_size[0]} ${window_size[1]}
+            else
+                echo "即将开始更新"
+                echo "从版本: $VERSION"
+                echo "更新到: $latest_version"
+                echo "请确保网络通畅"
+            fi
             
             # 恢复配置（如果更新成功）
             echo '
@@ -137,21 +235,60 @@ check_updates() {
             exit 0
         fi
     else
-        dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" ${window_size[0]} ${window_size[1]}
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" ${window_size[0]} ${window_size[1]}
+        else
+            echo "当前已是最新版本 $VERSION"
+        fi
     fi
+    
+    log_debug "检查更新完成"
 }
 
 # 卸载系统
 uninstall_system() {
-    local window_size=($(get_window_size))
+    log_debug "开始卸载流程"
     
-    dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" ${window_size[0]} ${window_size[1]}
+    local confirm_uninstall=1
     
-    if [ $? -eq 0 ]; then
-        dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" ${window_size[0]} ${window_size[1]}
+    if [ "$USE_TEXT_MODE" = false ]; then
+        local window_size=($(get_window_size))
+        dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" ${window_size[0]} ${window_size[1]}
+        confirm_uninstall=$?
+    else
+        echo "确定要卸载 ServerMaster 系统吗？"
+        echo "此操作将删除："
+        echo "- 所有脚本和模块"
+        echo "- 配置文件"
+        echo "- 系统命令"
+        echo "此操作不可恢复！"
+        read -p "确认卸载？(y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            confirm_uninstall=0
+        fi
+    fi
+    
+    if [ $confirm_uninstall -eq 0 ]; then
+        local second_confirm=1
         
-        if [ $? -eq 0 ]; then
-            dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." 5 40
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" ${window_size[0]} ${window_size[1]}
+            second_confirm=$?
+        else
+            read -p "最后确认：真的要卸载 ServerMaster 吗？(y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                second_confirm=0
+            fi
+        fi
+        
+        if [ $second_confirm -eq 0 ]; then
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." 5 40
+            else
+                echo "正在卸载 ServerMaster..."
+            fi
             sleep 1
             
             # 删除命令链接
@@ -164,18 +301,98 @@ uninstall_system() {
             rm -rf "/tmp/servermaster"
             rm -rf "/tmp/servermaster_*"
             
-            dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" ${window_size[0]} ${window_size[1]}
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" ${window_size[0]} ${window_size[1]}
+            else
+                echo "ServerMaster 已成功卸载！"
+            fi
             clear
             exit 0
         fi
     fi
     
     # 用户取消卸载，返回主菜单
+    log_debug "用户取消卸载"
     return
+}
+
+# 文本模式的菜单
+show_text_menu() {
+    log_debug "显示文本模式菜单"
+    
+    while true; do
+        clear
+        echo "====================================================="
+        echo "      ServerMaster 主菜单 (v$VERSION)                "
+        echo "====================================================="
+        echo ""
+        echo "  系统管理:                  网络与应用:"
+        echo "  1) 系统信息                5) Docker管理"
+        echo "  2) 系统更新                6) 工作区管理"
+        echo "  3) 系统清理                7) 检查更新"
+        echo "  4) BBR管理                 8) 卸载系统"
+        echo ""
+        echo "  0) 退出"
+        echo ""
+        read -p "请选择操作 [0-8]: " choice
+        
+        case $choice in
+            1) 
+                source "$MODULES_DIR/system/system_info.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            2) 
+                source "$MODULES_DIR/system/system_update.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            3) 
+                source "$MODULES_DIR/system/system_clean.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            4) 
+                source "$MODULES_DIR/network/bbr_manager.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            5) 
+                source "$MODULES_DIR/application/docker_manager.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            6) 
+                source "$MODULES_DIR/special/workspace.sh"
+                read -p "按Enter键继续..." 
+                ;;
+            7) 
+                check_updates
+                read -p "按Enter键继续..." 
+                ;;
+            8) 
+                uninstall_system
+                read -p "按Enter键继续..." 
+                ;;
+            0)
+                echo "确定要退出 ServerMaster 吗？"
+                read -p "确认退出？(y/n) " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    break
+                fi
+                ;;
+            *)
+                echo "无效选择，请重试"
+                sleep 1
+                ;;
+        esac
+    done
+    
+    clear
+    echo "感谢使用 ServerMaster，再见！"
+    exit 0
 }
 
 # 显示主菜单（两列布局，使用方向键选择）
 show_main_menu() {
+    log_debug "显示Dialog模式菜单"
+
     # 获取窗口尺寸
     local window_size=($(get_window_size))
     local win_height=${window_size[0]}
@@ -200,11 +417,13 @@ show_main_menu() {
                        "6" "│ 工作区管理 │ 管理工作区" \
                        "7" "│ 检查更新 │ 检查脚本更新" \
                        "8" "│ 卸载系统 │ 卸载ServerMaster" \
-                       "0" "│ 窗口设置 │ 调整界面大小" \
+                       "0" "│ 退出 │ 退出系统" \
                        3>&1 1>&2 2>&3)
         
         # 获取返回状态
         exit_status=$?
+        
+        log_debug "菜单选择: $choice, 状态: $exit_status"
         
         # 如果按了ESC或取消
         if [ $exit_status -ne 0 ]; then
@@ -217,67 +436,43 @@ show_main_menu() {
         fi
         
         case $choice in
-            "1") 
+            1) 
+                log_debug "选择了: 系统信息"
                 source "$MODULES_DIR/system/system_info.sh" 
                 ;;
-            "2") 
+            2) 
+                log_debug "选择了: 系统更新"
                 source "$MODULES_DIR/system/system_update.sh" 
                 ;;
-            "3") 
+            3) 
+                log_debug "选择了: 系统清理"
                 source "$MODULES_DIR/system/system_clean.sh" 
                 ;;
-            "4") 
+            4) 
+                log_debug "选择了: BBR管理"
                 source "$MODULES_DIR/network/bbr_manager.sh" 
                 ;;
-            "5") 
+            5) 
+                log_debug "选择了: Docker管理"
                 source "$MODULES_DIR/application/docker_manager.sh" 
                 ;;
-            "6") 
+            6) 
+                log_debug "选择了: 工作区管理"
                 source "$MODULES_DIR/special/workspace.sh" 
                 ;;
-            "7") 
+            7) 
+                log_debug "选择了: 检查更新"
                 check_updates 
                 ;;
-            "8") 
+            8) 
+                log_debug "选择了: 卸载系统"
                 uninstall_system
                 ;;
-            "9") 
+            0) 
+                log_debug "选择了: 退出"
                 dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
                 if [ $? -eq 0 ]; then
                     break
-                fi
-                ;;
-            "0")
-                # 显示窗口大小设置对话框
-                local new_size=$(dialog --title "设置窗口大小" \
-                                      --form "设置窗口尺寸（按百分比）：" 10 50 2 \
-                                      "窗口高度(%%):" 1 1 "$((win_height * 100 / $(tput lines)))" 1 16 5 0 \
-                                      "窗口宽度(%%):" 2 1 "$((win_width * 100 / $(tput cols)))" 2 16 5 0 \
-                                      3>&1 1>&2 2>&3)
-                
-                if [ $? -eq 0 ]; then
-                    # 解析输入
-                    local height_percent=$(echo "$new_size" | head -1)
-                    local width_percent=$(echo "$new_size" | tail -1)
-                    
-                    # 验证输入是否为数字
-                    if [[ "$height_percent" =~ ^[0-9]+$ ]] && [[ "$width_percent" =~ ^[0-9]+$ ]]; then
-                        # 限制在合理范围内
-                        [ $height_percent -lt 50 ] && height_percent=50
-                        [ $height_percent -gt 95 ] && height_percent=95
-                        [ $width_percent -lt 50 ] && width_percent=50
-                        [ $width_percent -gt 95 ] && width_percent=95
-                        
-                        # 更新窗口大小
-                        win_height=$(($(tput lines) * height_percent / 100))
-                        win_width=$(($(tput cols) * width_percent / 100))
-                        
-                        # 确保窗口尺寸合理
-                        [ $win_height -lt 25 ] && win_height=25
-                        [ $win_width -lt 75 ] && win_width=75
-                        
-                        dialog --title "窗口设置" --msgbox "窗口大小已更新！" 6 40
-                    fi
                 fi
                 ;;
         esac
@@ -286,6 +481,8 @@ show_main_menu() {
 
 # 主函数
 main() {
+    log_debug "主函数开始执行"
+    
     # 检查模块
     check_modules
     
@@ -293,18 +490,36 @@ main() {
     local window_size=($(get_window_size))
     
     # 欢迎界面
-    dialog --title "ServerMaster" \
-           --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" ${window_size[0]} ${window_size[1]}
+    if [ "$USE_TEXT_MODE" = false ]; then
+        dialog --title "ServerMaster" \
+               --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" ${window_size[0]} ${window_size[1]}
+    else
+        clear
+        echo "====================================================="
+        echo "欢迎使用 ServerMaster 服务器管理系统"
+        echo "当前版本: v$VERSION"
+        echo "====================================================="
+        echo ""
+        read -p "按Enter键继续..." 
+    fi
     
     # 检查更新
     check_updates
     
     # 显示主菜单
-    show_main_menu
+    if [ "$USE_TEXT_MODE" = false ]; then
+        show_main_menu
+    else
+        show_text_menu
+    fi
     
     # 退出时的消息
-    dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" ${window_size[0]} ${window_size[1]}
+    if [ "$USE_TEXT_MODE" = false ]; then
+        dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" ${window_size[0]} ${window_size[1]}
+    fi
     clear
+    
+    log_debug "脚本执行完毕"
 }
 
 # 启动程序

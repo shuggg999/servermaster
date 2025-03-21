@@ -16,8 +16,8 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
-# 文本模式 - 无需Dialog
-USE_TEXT_MODE=true
+# 支持回退到文本模式
+USE_TEXT_MODE=false
 
 # 日志函数
 log() {
@@ -42,6 +42,71 @@ log() {
     fi
 }
 
+# 在文件顶部添加一个新的函数用于显示实时日志
+# 在一个对话框中显示安装日志
+show_progress() {
+    # 如果是文本模式，则不显示对话框
+    if [ "$USE_TEXT_MODE" = true ]; then
+        return
+    fi
+    
+    local log_file="$LOGS_DIR/install.log"
+    local fifo_file="/tmp/servermaster_install_fifo"
+    
+    # 确保日志目录存在
+    mkdir -p "$LOGS_DIR"
+    
+    # 清空日志文件
+    : > "$log_file"
+    
+    # 创建FIFO前先检查是否存在
+    if [ -p "$fifo_file" ]; then
+        rm -f "$fifo_file"
+    fi
+    mkfifo "$fifo_file" || { 
+        log "ERROR" "无法创建FIFO文件，切换到文本模式"
+        USE_TEXT_MODE=true
+        return
+    }
+    
+    # 获取窗口尺寸
+    local term_height=$(tput lines 2>/dev/null || echo 24)
+    local term_width=$(tput cols 2>/dev/null || echo 80)
+    local win_height=$((term_height * 80 / 100))
+    local win_width=$((term_width * 80 / 100))
+    [ $win_height -lt 20 ] && win_height=20
+    [ $win_width -lt 70 ] && win_width=70
+    
+    # 启动dialog显示日志内容
+    dialog --title "ServerMaster 安装进度" \
+           --begin 2 2 \
+           --tailboxbg "$fifo_file" $((win_height-5)) $((win_width-10)) \
+           --and-widget \
+           --begin $((win_height-3)) 2 \
+           --infobox "安装中，请稍候..." 3 $((win_width-10)) 2>/dev/null &
+    
+    dialog_pid=$!
+    
+    # 添加初始内容到FIFO，防止file pointer错误
+    echo "正在初始化安装程序..." > "$fifo_file" 2>/dev/null &
+    
+    # 启动后台进程，从日志文件更新到FIFO
+    (
+        while true; do
+            if [ -f "$log_file" ]; then
+                # 使用cat而不是直接重定向，避免文件指针错误
+                cat "$log_file" > "$fifo_file" 2>/dev/null || true
+                sleep 1
+            fi
+        done
+    ) &
+    
+    tail_pid=$!
+    
+    # 返回FIFO路径，供日志函数使用
+    echo "$fifo_file"
+}
+
 # 执行命令并记录日志
 execute_cmd() {
     local cmd="$1"
@@ -58,6 +123,35 @@ execute_cmd() {
     else
         log "ERROR" "$error_msg: $output"
         return 1
+    fi
+}
+
+# 确保 Dialog 已安装
+ensure_dialog() {
+    log "INFO" "检查 Dialog 安装状态"
+    if ! command -v dialog &> /dev/null; then
+        log "INFO" "正在安装 Dialog..."
+        if command -v apt &> /dev/null; then
+            if ! execute_cmd "apt update && apt install -y dialog" "Dialog 安装成功" "Dialog 安装失败"; then
+                log "WARN" "无法安装 Dialog，切换到文本模式"
+                USE_TEXT_MODE=true
+            fi
+        elif command -v yum &> /dev/null; then
+            if ! execute_cmd "yum install -y dialog" "Dialog 安装成功" "Dialog 安装失败"; then
+                log "WARN" "无法安装 Dialog，切换到文本模式"
+                USE_TEXT_MODE=true
+            fi
+        elif command -v apk &> /dev/null; then
+            if ! execute_cmd "apk add dialog" "Dialog 安装成功" "Dialog 安装失败"; then
+                log "WARN" "无法安装 Dialog，切换到文本模式"
+                USE_TEXT_MODE=true
+            fi
+        else
+            log "WARN" "无法识别包管理器，无法安装 Dialog，切换到文本模式"
+            USE_TEXT_MODE=true
+        fi
+    else
+        log "INFO" "Dialog 已安装"
     fi
 }
 
@@ -92,6 +186,9 @@ check_system() {
                        "无法安装工具: $missing_tools"
         else
             log "ERROR" "无法安装必要的工具，请手动安装"
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "错误" --msgbox "无法安装必要的工具，请手动安装: $missing_tools" 8 60
+            fi
             exit 1
         fi
     else
@@ -149,6 +246,9 @@ check_connectivity() {
     
     if [ "$connected" = false ]; then
         log "ERROR" "无法连接到任何服务器，请检查网络连接: $output"
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "网络错误" --msgbox "连接错误: $output" 8 60
+        fi
         exit 1
     fi
 }
@@ -171,6 +271,8 @@ download_main_script() {
     if output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "$CF_PROXY_URL/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
         # 检查文件大小确保下载成功
         if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            # 修复main.sh中的dialog检查部分，添加回退到文本模式
+            sed -i 's/if ! command -v dialog \&> \/dev\/null; then/if ! command -v dialog \&> \/dev\/null; then\n    echo "警告: Dialog 未安装，使用文本模式。"\n    export USE_TEXT_MODE=true/g' "$TEMP_DIR/main.sh.tmp"
             mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
             chmod +x "$INSTALL_DIR/main.sh"
             log "SUCCESS" "从Cloudflare Workers下载主脚本成功"
@@ -182,6 +284,8 @@ download_main_script() {
     # 尝试GitHub直连
     elif output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "$GITHUB_RAW/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
         if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            # 修复main.sh中的dialog检查部分，添加回退到文本模式
+            sed -i 's/if ! command -v dialog \&> \/dev\/null; then/if ! command -v dialog \&> \/dev\/null; then\n    echo "警告: Dialog 未安装，使用文本模式。"\n    export USE_TEXT_MODE=true/g' "$TEMP_DIR/main.sh.tmp"
             mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
             chmod +x "$INSTALL_DIR/main.sh"
             log "SUCCESS" "从GitHub直连下载主脚本成功"
@@ -193,6 +297,8 @@ download_main_script() {
     # 尝试镜像站
     elif output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "${MIRROR_URL}${GITHUB_RAW}/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
         if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            # 修复main.sh中的dialog检查部分，添加回退到文本模式
+            sed -i 's/if ! command -v dialog \&> \/dev\/null; then/if ! command -v dialog \&> \/dev\/null; then\n    echo "警告: Dialog 未安装，使用文本模式。"\n    export USE_TEXT_MODE=true/g' "$TEMP_DIR/main.sh.tmp"
             mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
             chmod +x "$INSTALL_DIR/main.sh"
             log "SUCCESS" "从镜像站下载主脚本成功"
@@ -208,6 +314,9 @@ download_main_script() {
     
     if [ "$download_success" = false ]; then
         log "ERROR" "所有下载源均无法下载主脚本: $output"
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
+        fi
         exit 1
     fi
 }
@@ -268,6 +377,9 @@ download_modules() {
     
     if [ "$download_success" = false ]; then
         log "ERROR" "所有下载源均无法下载系统模块: $output"
+        if [ "$USE_TEXT_MODE" = false ]; then
+            dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
+        fi
         exit 1
     fi
 }
@@ -313,25 +425,42 @@ finalize() {
     # 设置权限
     chmod -R 755 "$INSTALL_DIR"
     
-    log "SUCCESS" "ServerMaster 安装完成！当前版本: $(cat $INSTALL_DIR/version.txt)"
-    log "SUCCESS" "您可以通过执行 'sm' 命令启动系统"
+    if [ "$USE_TEXT_MODE" = false ]; then
+        dialog --title "安装完成" --msgbox "ServerMaster 安装完成！\n\n当前版本: $(cat $INSTALL_DIR/version.txt)\n\n正在启动系统..." 10 50
+    else
+        echo ""
+        echo "====================================================="
+        echo "  ServerMaster 安装完成！"
+        echo "  当前版本: $(cat $INSTALL_DIR/version.txt)"
+        echo "  正在启动系统..."
+        echo "====================================================="
+        echo ""
+    fi
     
-    echo ""
-    echo "====================================================="
-    echo "  ServerMaster 安装完成！"
-    echo "  当前版本: $(cat $INSTALL_DIR/version.txt)"
-    echo "  运行命令: sm"
-    echo "====================================================="
-    echo ""
+    # 自动启动main.sh
+    clear
+    exec "$INSTALL_DIR/main.sh"
 }
 
 # 主函数
 main() {
-    clear
-    echo "====================================================="
-    echo "          ServerMaster 安装程序启动                  "
-    echo "====================================================="
-    echo ""
+    # 先检查是否有Dialog，如果没有尝试安装
+    if ! command -v dialog &> /dev/null; then
+        echo "Dialog 未安装，尝试安装..."
+        ensure_dialog
+    fi
+    
+    # 如果文本模式，显示欢迎信息
+    if [ "$USE_TEXT_MODE" = true ]; then
+        clear
+        echo "====================================================="
+        echo "          ServerMaster 安装程序启动                  "
+        echo "====================================================="
+        echo ""
+    else
+        # 启动进度显示
+        FIFO_FILE=$(show_progress)
+    fi
     
     # 记录欢迎消息
     log "INFO" "欢迎使用 ServerMaster 安装向导！"
@@ -346,7 +475,12 @@ main() {
     log "INFO" "5. 下载系统模块"
     log "INFO" "6. 创建系统命令"
     log "INFO" "7. 完成安装"
-    echo ""
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo ""
+    else
+        sleep 1
+    fi
     
     # 执行安装步骤
     check_system
@@ -357,8 +491,27 @@ main() {
     create_command
     
     # 完成安装
+    log "SUCCESS" "ServerMaster 安装完成！"
+    
+    if [ "$USE_TEXT_MODE" = false ]; then
+        # 关闭进度监控
+        kill $tail_pid 2>/dev/null || true
+        kill $dialog_pid 2>/dev/null || true
+        rm -f "$FIFO_FILE" 2>/dev/null || true
+    fi
+    
+    # 执行完成函数
     finalize
 }
+
+# 检测是否通过管道运行 - 简单的检测方法
+if ! tty -s && [ -p /dev/stdin ]; then
+    temp_script=$(mktemp /tmp/servermaster_install_XXXXXX.sh)
+    cat > "$temp_script"
+    chmod +x "$temp_script"
+    exec bash "$temp_script"
+    exit $?
+fi
 
 # 启动安装
 main
