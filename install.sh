@@ -22,6 +22,54 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
+# 在文件顶部添加一个新的函数用于显示实时日志
+# 在一个对话框中显示安装日志
+show_progress() {
+    local log_file="$LOGS_DIR/install.log"
+    local fifo_file="/tmp/servermaster_install_fifo"
+    
+    # 创建FIFO
+    rm -f "$fifo_file"
+    mkfifo "$fifo_file"
+    
+    # 获取窗口尺寸
+    local term_height=$(tput lines)
+    local term_width=$(tput cols)
+    local win_height=$((term_height * 80 / 100))
+    local win_width=$((term_width * 80 / 100))
+    [ $win_height -lt 20 ] && win_height=20
+    [ $win_width -lt 70 ] && win_width=70
+    
+    # 清空日志文件
+    mkdir -p "$LOGS_DIR"
+    : > "$log_file"
+    
+    # 启动dialog显示日志内容
+    dialog --title "ServerMaster 安装进度" \
+           --begin 2 2 \
+           --tailboxbg "$fifo_file" $((win_height-5)) $((win_width-10)) \
+           --and-widget \
+           --begin $((win_height-3)) 2 \
+           --infobox "安装中，请稍候..." 3 $((win_width-10)) &
+    
+    dialog_pid=$!
+    
+    # 启动后台进程，从日志文件更新到FIFO
+    (
+        while true; do
+            if [ -f "$log_file" ]; then
+                cat "$log_file" > "$fifo_file"
+                sleep 0.5
+            fi
+        done
+    ) &
+    
+    tail_pid=$!
+    
+    # 返回FIFO路径，供日志函数使用
+    echo "$fifo_file"
+}
+
 # 日志函数
 log() {
     local level="$1"
@@ -32,40 +80,24 @@ log() {
     mkdir -p "$LOGS_DIR"
     
     # 写入日志文件
-    echo "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
-    
-    # 在界面上显示
-    case "$level" in
-        "INFO")
-            dialog --title "安装信息" --msgbox "$message" 6 60
-            ;;
-        "SUCCESS")
-            dialog --title "安装成功" --msgbox "✅ $message" 6 60
-            ;;
-        "ERROR")
-            dialog --title "安装错误" --msgbox "❌ $message" 6 60
-            ;;
-        *)
-            dialog --title "安装信息" --msgbox "$message" 6 60
-            ;;
-    esac
+    echo -e "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
 }
 
-# 执行命令并显示结果
+# 执行命令并记录日志
 execute_cmd() {
     local cmd="$1"
     local success_msg="$2"
     local error_msg="$3"
     
+    log "INFO" "执行: $cmd"
+    
     # 执行命令并捕获输出
     local output
     if output=$(eval "$cmd" 2>&1); then
-        dialog --title "执行结果" --msgbox "命令执行成功:\n$success_msg\n\n输出:\n$output" 12 70
-        log "SUCCESS" "$success_msg"
+        log "SUCCESS" "$success_msg\n$output"
         return 0
     else
-        dialog --title "执行错误" --msgbox "命令执行失败:\n$error_msg\n\n错误:\n$output" 12 70
-        log "ERROR" "$error_msg"
+        log "ERROR" "$error_msg\n$output"
         return 1
     fi
 }
@@ -303,18 +335,26 @@ finalize() {
     exec "$INSTALL_DIR/main.sh"
 }
 
-# 显示安装步骤
-show_install_steps() {
-    dialog --title "安装步骤" --msgbox "ServerMaster 安装向导\n\n1. 检查系统要求\n2. 创建必要目录\n3. 检查网络连接\n4. 下载主脚本\n5. 下载系统模块\n6. 创建系统命令\n7. 完成安装" 12 50
-}
-
 # 主函数
 main() {
-    # 显示欢迎信息
-    dialog --title "欢迎" --msgbox "欢迎使用 ServerMaster 安装向导！\n\n本向导将帮助您安装 ServerMaster 系统。" 8 50
+    # 启动进度显示
+    FIFO_FILE=$(show_progress)
+    
+    # 记录欢迎消息
+    log "INFO" "欢迎使用 ServerMaster 安装向导！"
+    log "INFO" "正在准备安装..."
+    sleep 1
     
     # 显示安装步骤
-    show_install_steps
+    log "INFO" "安装将执行以下步骤:"
+    log "INFO" "1. 检查系统要求"
+    log "INFO" "2. 创建必要目录"
+    log "INFO" "3. 检查网络连接"
+    log "INFO" "4. 下载主脚本"
+    log "INFO" "5. 下载系统模块"
+    log "INFO" "6. 创建系统命令"
+    log "INFO" "7. 完成安装"
+    sleep 1
     
     # 执行安装步骤
     ensure_dialog
@@ -324,6 +364,17 @@ main() {
     download_main_script
     download_modules
     create_command
+    
+    # 完成安装
+    log "SUCCESS" "ServerMaster 安装完成！"
+    sleep 2
+    
+    # 关闭进度监控
+    kill $tail_pid 2>/dev/null
+    kill $dialog_pid 2>/dev/null
+    rm -f "$FIFO_FILE"
+    
+    # 运行完成函数
     finalize
 }
 

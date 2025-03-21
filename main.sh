@@ -174,55 +174,39 @@ uninstall_system() {
     return
 }
 
-# 显示主菜单（两列排列）
+# 显示主菜单（两列布局，使用方向键选择）
 show_main_menu() {
     # 获取窗口尺寸
     local window_size=($(get_window_size))
     local win_height=${window_size[0]}
     local win_width=${window_size[1]}
     
+    # 确保足够的空间来显示所有菜单项
+    [ $win_height -lt 25 ] && win_height=25
+    [ $win_width -lt 75 ] && win_width=75
+    
     while true; do
-        # 使用对话框创建一个临时菜单文件
-        local temp_menu=$(mktemp)
+        # 创建单个菜单，使用美观的布局
+        choice=$(dialog --clear \
+                       --title "ServerMaster 主菜单 (v$VERSION)" \
+                       --backtitle "ServerMaster v$VERSION" \
+                       --size $win_height $win_width \
+                       --menu "\n      ╔══════════ 系统管理 ══════════╗    ╔══════════ 网络与应用 ══════════╗\n      ║                            ║    ║                                ║\n      ╚════════════════════════════╝    ╚════════════════════════════════╝\n\n请使用↑↓方向键选择操作，按Enter键确认:" 18 80 9 \
+                       "1" "│ 系统信息 │ 查看服务器详细信息" \
+                       "2" "│ 系统更新 │ 更新系统软件包" \
+                       "3" "│ 系统清理 │ 清理系统临时文件" \
+                       "4" "│ BBR管理  │ TCP加速管理" \
+                       "5" "│ Docker管理 │ 容器应用管理" \
+                       "6" "│ 工作区管理 │ 管理工作区" \
+                       "7" "│ 检查更新 │ 检查脚本更新" \
+                       "8" "│ 卸载系统 │ 卸载ServerMaster" \
+                       "0" "│ 窗口设置 │ 调整界面大小" \
+                       3>&1 1>&2 2>&3)
         
-        # 创建两列菜单
-        cat > "$temp_menu" << EOF
-#!/bin/bash
-# 两列菜单的dialog脚本
-
-# 获取窗口尺寸
-win_height=$win_height
-win_width=$win_width
-
-# 计算菜单的中心位置
-center_y=\$(( win_height / 2 - 5 ))
-left_x=\$(( win_width / 4 - 10 ))
-right_x=\$(( 3 * win_width / 4 - 10 ))
-
-# 使用dialog绘制标题和边框
-dialog --clear --title "ServerMaster 主菜单" \\
-       --backtitle "ServerMaster v$VERSION" \\
-       --begin 2 2 --size \$win_height \$win_width \\
-       --no-collapse \\
-       --cr-wrap \\
-       --no-shadow \\
-       --msgbox "\\n\\n\\n\\n        ┌───────────────────────┐        ┌───────────────────────┐\\n        │  系统管理              │        │  网络工具              │\\n        ├───────────────────────┤        ├───────────────────────┤\\n        │ 1. 系统信息            │        │ 4. BBR管理             │\\n        │ 2. 系统更新            │        │ 5. Docker管理          │\\n        │ 3. 系统清理            │        │ 6. 工作区管理          │\\n        └───────────────────────┘        └───────────────────────┘\\n\\n\\n        ┌───────────────────────┐        ┌───────────────────────┐\\n        │  系统操作              │        │  退出操作              │\\n        ├───────────────────────┤        ├───────────────────────┤\\n        │ 7. 检查更新            │        │ 8. 卸载系统            │\\n        │                       │        │ 9. 退出系统            │\\n        │                       │        │                       │\\n        └───────────────────────┘        └───────────────────────┘\\n\\n                         请输入选项 [1-9]:" \$win_height \$win_width
-EOF
-        
-        chmod +x "$temp_menu"
-        
-        # 显示菜单并捕获输入
-        $temp_menu 3>&1 1>&2 2>&3
+        # 获取返回状态
         exit_status=$?
         
-        # 获取用户输入的菜单选项
-        choice=$(dialog --title "输入选项" --inputbox "请输入您的选择 [1-9]:" 8 40 3>&1 1>&2 2>&3)
-        exit_status=$?
-        
-        # 清理临时文件
-        rm -f "$temp_menu"
-        
-        # 检查是否按下了取消按钮
+        # 如果按了ESC或取消
         if [ $exit_status -ne 0 ]; then
             dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
             if [ $? -eq 0 ]; then
@@ -232,71 +216,69 @@ EOF
             fi
         fi
         
-        # 设置窗口大小的特殊命令
-        if [ "$choice" = "0" ]; then
-            # 显示窗口大小设置对话框
-            local new_size=$(dialog --title "设置窗口大小" \
-                                  --form "设置窗口尺寸（按百分比）：" 10 50 2 \
-                                  "窗口高度(%%):" 1 1 "$((win_height * 100 / $(tput lines)))" 1 16 5 0 \
-                                  "窗口宽度(%%):" 2 1 "$((win_width * 100 / $(tput cols)))" 2 16 5 0 \
-                                  3>&1 1>&2 2>&3)
-            
-            if [ $? -eq 0 ]; then
-                # 解析输入
-                local height_percent=$(echo "$new_size" | head -1)
-                local width_percent=$(echo "$new_size" | tail -1)
-                
-                # 验证输入是否为数字
-                if [[ "$height_percent" =~ ^[0-9]+$ ]] && [[ "$width_percent" =~ ^[0-9]+$ ]]; then
-                    # 限制在合理范围内
-                    [ $height_percent -lt 50 ] && height_percent=50
-                    [ $height_percent -gt 95 ] && height_percent=95
-                    [ $width_percent -lt 50 ] && width_percent=50
-                    [ $width_percent -gt 95 ] && width_percent=95
-                    
-                    # 更新窗口大小
-                    win_height=$(($(tput lines) * height_percent / 100))
-                    win_width=$(($(tput cols) * width_percent / 100))
-                    
-                    dialog --title "窗口设置" --msgbox "窗口大小已更新！" 6 40
-                fi
-            fi
-            continue
-        fi
-        
         case $choice in
-            1) 
+            "1") 
                 source "$MODULES_DIR/system/system_info.sh" 
                 ;;
-            2) 
+            "2") 
                 source "$MODULES_DIR/system/system_update.sh" 
                 ;;
-            3) 
+            "3") 
                 source "$MODULES_DIR/system/system_clean.sh" 
                 ;;
-            4) 
+            "4") 
                 source "$MODULES_DIR/network/bbr_manager.sh" 
                 ;;
-            5) 
+            "5") 
                 source "$MODULES_DIR/application/docker_manager.sh" 
                 ;;
-            6) 
+            "6") 
                 source "$MODULES_DIR/special/workspace.sh" 
                 ;;
-            7) 
+            "7") 
                 check_updates 
                 ;;
-            8) 
+            "8") 
                 uninstall_system
                 ;;
-            9) 
+            "9") 
                 dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
                 if [ $? -eq 0 ]; then
                     break
                 fi
                 ;;
-            *)
-                dialog --title "无效选择" --msgbox "请输入有效的选项 (1-9)" 6 40
+            "0")
+                # 显示窗口大小设置对话框
+                local new_size=$(dialog --title "设置窗口大小" \
+                                      --form "设置窗口尺寸（按百分比）：" 10 50 2 \
+                                      "窗口高度(%%):" 1 1 "$((win_height * 100 / $(tput lines)))" 1 16 5 0 \
+                                      "窗口宽度(%%):" 2 1 "$((win_width * 100 / $(tput cols)))" 2 16 5 0 \
+                                      3>&1 1>&2 2>&3)
+                
+                if [ $? -eq 0 ]; then
+                    # 解析输入
+                    local height_percent=$(echo "$new_size" | head -1)
+                    local width_percent=$(echo "$new_size" | tail -1)
+                    
+                    # 验证输入是否为数字
+                    if [[ "$height_percent" =~ ^[0-9]+$ ]] && [[ "$width_percent" =~ ^[0-9]+$ ]]; then
+                        # 限制在合理范围内
+                        [ $height_percent -lt 50 ] && height_percent=50
+                        [ $height_percent -gt 95 ] && height_percent=95
+                        [ $width_percent -lt 50 ] && width_percent=50
+                        [ $width_percent -gt 95 ] && width_percent=95
+                        
+                        # 更新窗口大小
+                        win_height=$(($(tput lines) * height_percent / 100))
+                        win_width=$(($(tput cols) * width_percent / 100))
+                        
+                        # 确保窗口尺寸合理
+                        [ $win_height -lt 25 ] && win_height=25
+                        [ $win_width -lt 75 ] && win_width=75
+                        
+                        dialog --title "窗口设置" --msgbox "窗口大小已更新！" 6 40
+                    fi
+                fi
                 ;;
         esac
     done
