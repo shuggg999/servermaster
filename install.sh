@@ -66,7 +66,7 @@ check_system() {
     log "INFO" "检查系统要求"
     
     # 检查必要的工具
-    local required_tools="curl wget tar gzip"
+    local required_tools="curl wget tar gzip dialog"
     local missing_tools=""
     
     for tool in $required_tools; do
@@ -96,6 +96,15 @@ check_system() {
         fi
     else
         log "SUCCESS" "所有必要工具已安装"
+    fi
+    
+    # 再次检查dialog是否成功安装，这对于脚本的交互功能非常重要
+    if ! command -v dialog &> /dev/null; then
+        log "ERROR" "无法安装dialog，将使用文本模式"
+        export USE_TEXT_MODE=true
+    else
+        log "SUCCESS" "Dialog已安装: $(dialog --version 2>&1 | head -n 1)"
+        export USE_TEXT_MODE=false
     fi
 }
 
