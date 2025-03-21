@@ -27,16 +27,37 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
+# 获取适合的窗口大小
+get_window_size() {
+    # 获取终端大小
+    local term_height=$(tput lines)
+    local term_width=$(tput cols)
+    
+    # 默认使用80%的终端空间
+    local win_height=$((term_height * 80 / 100))
+    local win_width=$((term_width * 80 / 100))
+    
+    # 确保窗口尺寸在合理范围内
+    [ $win_height -lt 20 ] && win_height=20
+    [ $win_width -lt 70 ] && win_width=70
+    
+    echo "${win_height} ${win_width}"
+}
+
 # 检查模块目录是否存在
 check_modules() {
+    local window_size=($(get_window_size))
+    
     if [ ! -d "$MODULES_DIR" ]; then
-        dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" 8 40
+        dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" ${window_size[0]} ${window_size[1]}
         exit 1
     fi
 }
 
 # 检查更新
 check_updates() {
+    local window_size=($(get_window_size))
+    
     dialog --title "检查更新" --infobox "正在检查更新..." 5 40
     sleep 1
     
@@ -49,13 +70,13 @@ check_updates() {
     
     # 尝试从不同源获取最新版本
     if latest_version=$(curl -s --connect-timeout 5 "$CF_PROXY_URL/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+        dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
     elif latest_version=$(curl -s --connect-timeout 5 "$GITHUB_RAW/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+        dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
     elif latest_version=$(curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
-        dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" 8 60
+        dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
     else
-        dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" 6 50
+        dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" ${window_size[0]} ${window_size[1]}
         return
     fi
     
@@ -63,7 +84,7 @@ check_updates() {
     latest_version=$(echo "$latest_version" | tr -cd '0-9\.\n')
     
     if [ "$VERSION" != "$latest_version" ]; then
-        dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" 8 60
+        dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" ${window_size[0]} ${window_size[1]}
         
         if [ $? -eq 0 ]; then
             dialog --title "更新中" --infobox "正在准备更新..." 5 40
@@ -86,7 +107,7 @@ check_updates() {
             elif curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/install.sh" > "/tmp/servermaster_install.sh" 2>/dev/null; then
                 update_cmd="/tmp/servermaster_install.sh"
             else
-                dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" 6 40
+                dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" ${window_size[0]} ${window_size[1]}
                 return
             fi
             
@@ -94,7 +115,7 @@ check_updates() {
             chmod +x "$update_cmd"
             
             # 显示更新日志
-            dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" 10 50
+            dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" ${window_size[0]} ${window_size[1]}
             
             # 恢复配置（如果更新成功）
             echo '
@@ -116,16 +137,18 @@ check_updates() {
             exit 0
         fi
     else
-        dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" 6 40
+        dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" ${window_size[0]} ${window_size[1]}
     fi
 }
 
 # 卸载系统
 uninstall_system() {
-    dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" 12 60
+    local window_size=($(get_window_size))
+    
+    dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" ${window_size[0]} ${window_size[1]}
     
     if [ $? -eq 0 ]; then
-        dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" 8 50
+        dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" ${window_size[0]} ${window_size[1]}
         
         if [ $? -eq 0 ]; then
             dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." 5 40
@@ -141,7 +164,7 @@ uninstall_system() {
             rm -rf "/tmp/servermaster"
             rm -rf "/tmp/servermaster_*"
             
-            dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" 6 40
+            dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" ${window_size[0]} ${window_size[1]}
             clear
             exit 0
         fi
@@ -151,24 +174,53 @@ uninstall_system() {
     return
 }
 
-# 显示主菜单
+# 显示主菜单（两列排列）
 show_main_menu() {
+    # 获取窗口尺寸
+    local window_size=($(get_window_size))
+    local win_height=${window_size[0]}
+    local win_width=${window_size[1]}
+    
     while true; do
-        choice=$(dialog --title "ServerMaster 主菜单" \
-                       --backtitle "ServerMaster v$VERSION" \
-                       --menu "请选择要执行的操作：" 15 60 9 \
-                       "1" "系统信息" \
-                       "2" "系统更新" \
-                       "3" "系统清理" \
-                       "4" "BBR管理" \
-                       "5" "Docker管理" \
-                       "6" "工作区管理" \
-                       "7" "脚本更新" \
-                       "8" "卸载系统" \
-                       "9" "退出系统" \
-                       3>&1 1>&2 2>&3)
+        # 使用对话框创建一个临时菜单文件
+        local temp_menu=$(mktemp)
         
+        # 创建两列菜单
+        cat > "$temp_menu" << EOF
+#!/bin/bash
+# 两列菜单的dialog脚本
+
+# 获取窗口尺寸
+win_height=$win_height
+win_width=$win_width
+
+# 计算菜单的中心位置
+center_y=\$(( win_height / 2 - 5 ))
+left_x=\$(( win_width / 4 - 10 ))
+right_x=\$(( 3 * win_width / 4 - 10 ))
+
+# 使用dialog绘制标题和边框
+dialog --clear --title "ServerMaster 主菜单" \\
+       --backtitle "ServerMaster v$VERSION" \\
+       --begin 2 2 --size \$win_height \$win_width \\
+       --no-collapse \\
+       --cr-wrap \\
+       --no-shadow \\
+       --msgbox "\\n\\n\\n\\n        ┌───────────────────────┐        ┌───────────────────────┐\\n        │  系统管理              │        │  网络工具              │\\n        ├───────────────────────┤        ├───────────────────────┤\\n        │ 1. 系统信息            │        │ 4. BBR管理             │\\n        │ 2. 系统更新            │        │ 5. Docker管理          │\\n        │ 3. 系统清理            │        │ 6. 工作区管理          │\\n        └───────────────────────┘        └───────────────────────┘\\n\\n\\n        ┌───────────────────────┐        ┌───────────────────────┐\\n        │  系统操作              │        │  退出操作              │\\n        ├───────────────────────┤        ├───────────────────────┤\\n        │ 7. 检查更新            │        │ 8. 卸载系统            │\\n        │                       │        │ 9. 退出系统            │\\n        │                       │        │                       │\\n        └───────────────────────┘        └───────────────────────┘\\n\\n                         请输入选项 [1-9]:" \$win_height \$win_width
+EOF
+        
+        chmod +x "$temp_menu"
+        
+        # 显示菜单并捕获输入
+        $temp_menu 3>&1 1>&2 2>&3
         exit_status=$?
+        
+        # 获取用户输入的菜单选项
+        choice=$(dialog --title "输入选项" --inputbox "请输入您的选择 [1-9]:" 8 40 3>&1 1>&2 2>&3)
+        exit_status=$?
+        
+        # 清理临时文件
+        rm -f "$temp_menu"
         
         # 检查是否按下了取消按钮
         if [ $exit_status -ne 0 ]; then
@@ -178,6 +230,38 @@ show_main_menu() {
             else
                 continue
             fi
+        fi
+        
+        # 设置窗口大小的特殊命令
+        if [ "$choice" = "0" ]; then
+            # 显示窗口大小设置对话框
+            local new_size=$(dialog --title "设置窗口大小" \
+                                  --form "设置窗口尺寸（按百分比）：" 10 50 2 \
+                                  "窗口高度(%%):" 1 1 "$((win_height * 100 / $(tput lines)))" 1 16 5 0 \
+                                  "窗口宽度(%%):" 2 1 "$((win_width * 100 / $(tput cols)))" 2 16 5 0 \
+                                  3>&1 1>&2 2>&3)
+            
+            if [ $? -eq 0 ]; then
+                # 解析输入
+                local height_percent=$(echo "$new_size" | head -1)
+                local width_percent=$(echo "$new_size" | tail -1)
+                
+                # 验证输入是否为数字
+                if [[ "$height_percent" =~ ^[0-9]+$ ]] && [[ "$width_percent" =~ ^[0-9]+$ ]]; then
+                    # 限制在合理范围内
+                    [ $height_percent -lt 50 ] && height_percent=50
+                    [ $height_percent -gt 95 ] && height_percent=95
+                    [ $width_percent -lt 50 ] && width_percent=50
+                    [ $width_percent -gt 95 ] && width_percent=95
+                    
+                    # 更新窗口大小
+                    win_height=$(($(tput lines) * height_percent / 100))
+                    win_width=$(($(tput cols) * width_percent / 100))
+                    
+                    dialog --title "窗口设置" --msgbox "窗口大小已更新！" 6 40
+                fi
+            fi
+            continue
         fi
         
         case $choice in
@@ -211,6 +295,9 @@ show_main_menu() {
                     break
                 fi
                 ;;
+            *)
+                dialog --title "无效选择" --msgbox "请输入有效的选项 (1-9)" 6 40
+                ;;
         esac
     done
 }
@@ -220,9 +307,12 @@ main() {
     # 检查模块
     check_modules
     
+    # 获取窗口尺寸
+    local window_size=($(get_window_size))
+    
     # 欢迎界面
     dialog --title "ServerMaster" \
-           --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" 8 50
+           --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" ${window_size[0]} ${window_size[1]}
     
     # 检查更新
     check_updates
@@ -231,7 +321,7 @@ main() {
     show_main_menu
     
     # 退出时的消息
-    dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" 6 40
+    dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" ${window_size[0]} ${window_size[1]}
     clear
 }
 
