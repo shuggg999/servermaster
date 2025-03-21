@@ -3,6 +3,20 @@
 # ServerMaster Installation Script
 # This script installs the ServerMaster system
 
+# 检测是否通过管道运行
+is_piped() {
+    [ -p /dev/stdin ]
+}
+
+# 如果是通过管道运行，先将脚本内容保存到临时文件再执行
+if is_piped; then
+    temp_script=$(mktemp /tmp/servermaster_install_XXXXXX.sh)
+    cat > "$temp_script"
+    chmod +x "$temp_script"
+    exec bash "$temp_script"
+    exit $?
+fi
+
 # 检查 Dialog 是否已安装
 if ! command -v dialog &> /dev/null; then
     echo "错误: Dialog 未安装，请先安装 Dialog。"
@@ -22,11 +36,30 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
+# 日志函数
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    
+    # 确保日志目录存在
+    mkdir -p "$LOGS_DIR"
+    
+    # 写入日志文件
+    echo -e "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
+}
+
 # 在文件顶部添加一个新的函数用于显示实时日志
 # 在一个对话框中显示安装日志
 show_progress() {
     local log_file="$LOGS_DIR/install.log"
     local fifo_file="/tmp/servermaster_install_fifo"
+    
+    # 确保日志目录存在
+    mkdir -p "$LOGS_DIR"
+    
+    # 清空日志文件
+    : > "$log_file"
     
     # 创建FIFO
     rm -f "$fifo_file"
@@ -40,10 +73,6 @@ show_progress() {
     [ $win_height -lt 20 ] && win_height=20
     [ $win_width -lt 70 ] && win_width=70
     
-    # 清空日志文件
-    mkdir -p "$LOGS_DIR"
-    : > "$log_file"
-    
     # 启动dialog显示日志内容
     dialog --title "ServerMaster 安装进度" \
            --begin 2 2 \
@@ -54,12 +83,16 @@ show_progress() {
     
     dialog_pid=$!
     
+    # 添加初始内容到FIFO，防止file pointer错误
+    echo "正在初始化安装程序..." > "$fifo_file" &
+    
     # 启动后台进程，从日志文件更新到FIFO
     (
         while true; do
             if [ -f "$log_file" ]; then
-                cat "$log_file" > "$fifo_file"
-                sleep 0.5
+                # 使用cat而不是直接重定向，避免文件指针错误
+                cat "$log_file" > "$fifo_file" 2>/dev/null || true
+                sleep 1
             fi
         done
     ) &
@@ -68,19 +101,6 @@ show_progress() {
     
     # 返回FIFO路径，供日志函数使用
     echo "$fifo_file"
-}
-
-# 日志函数
-log() {
-    local level="$1"
-    local message="$2"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    
-    # 确保日志目录存在
-    mkdir -p "$LOGS_DIR"
-    
-    # 写入日志文件
-    echo -e "[$timestamp] [$level] $message" >> "$LOGS_DIR/install.log"
 }
 
 # 执行命令并记录日志
@@ -228,25 +248,50 @@ download_main_script() {
     local download_success=false
     local output=""
     
+    # 创建临时目录
+    mkdir -p "$TEMP_DIR"
+    
     # 尝试Cloudflare Workers代理
-    if output=$(curl -s -o "$INSTALL_DIR/main.sh" "$CF_PROXY_URL/main.sh" 2>&1); then
-        chmod +x "$INSTALL_DIR/main.sh"
-        log "SUCCESS" "从Cloudflare Workers下载主脚本成功"
-        download_success=true
+    if output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "$CF_PROXY_URL/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+        # 检查文件大小确保下载成功
+        if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
+            chmod +x "$INSTALL_DIR/main.sh"
+            log "SUCCESS" "从Cloudflare Workers下载主脚本成功"
+            download_success=true
+        else
+            log "ERROR" "从Cloudflare Workers下载的文件为空"
+            rm -f "$TEMP_DIR/main.sh.tmp"
+        fi
     # 尝试GitHub直连
-    elif output=$(curl -s -o "$INSTALL_DIR/main.sh" "$GITHUB_RAW/main.sh" 2>&1); then
-        chmod +x "$INSTALL_DIR/main.sh"
-        log "SUCCESS" "从GitHub直连下载主脚本成功"
-        download_success=true
+    elif output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "$GITHUB_RAW/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+        if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
+            chmod +x "$INSTALL_DIR/main.sh"
+            log "SUCCESS" "从GitHub直连下载主脚本成功"
+            download_success=true
+        else
+            log "ERROR" "从GitHub直连下载的文件为空"
+            rm -f "$TEMP_DIR/main.sh.tmp"
+        fi
     # 尝试镜像站
-    elif output=$(curl -s -o "$INSTALL_DIR/main.sh" "${MIRROR_URL}${GITHUB_RAW}/main.sh" 2>&1); then
-        chmod +x "$INSTALL_DIR/main.sh"
-        log "SUCCESS" "从镜像站下载主脚本成功"
-        download_success=true
+    elif output=$(curl -s -S -o "$TEMP_DIR/main.sh.tmp" "${MIRROR_URL}${GITHUB_RAW}/main.sh" 2>&1) && [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+        if [ -s "$TEMP_DIR/main.sh.tmp" ]; then
+            mv "$TEMP_DIR/main.sh.tmp" "$INSTALL_DIR/main.sh"
+            chmod +x "$INSTALL_DIR/main.sh"
+            log "SUCCESS" "从镜像站下载主脚本成功"
+            download_success=true
+        else
+            log "ERROR" "从镜像站下载的文件为空"
+            rm -f "$TEMP_DIR/main.sh.tmp"
+        fi
     fi
     
+    # 清理临时文件
+    rm -f "$TEMP_DIR/main.sh.tmp"
+    
     if [ "$download_success" = false ]; then
-        log "ERROR" "所有下载源均无法下载主脚本"
+        log "ERROR" "所有下载源均无法下载主脚本: $output"
         dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
         exit 1
     fi
@@ -259,31 +304,55 @@ download_modules() {
     local download_success=false
     local output=""
     
+    # 创建临时目录
+    mkdir -p "$TEMP_DIR"
+    
     # 尝试Cloudflare Workers代理
-    if output=$(curl -s -o "$TEMP_DIR/modules.tar.gz" "$CF_PROXY_URL/modules.tar.gz" 2>&1); then
-        execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
-                   "模块解压成功" \
-                   "模块解压失败"
-        log "SUCCESS" "从Cloudflare Workers下载并解压模块成功"
-        download_success=true
+    if output=$(curl -s -S -o "$TEMP_DIR/modules.tar.gz.tmp" "$CF_PROXY_URL/modules.tar.gz" 2>&1) && [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+        if [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+            mv "$TEMP_DIR/modules.tar.gz.tmp" "$TEMP_DIR/modules.tar.gz"
+            execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
+                       "模块解压成功" \
+                       "模块解压失败"
+            log "SUCCESS" "从Cloudflare Workers下载并解压模块成功"
+            download_success=true
+        else
+            log "ERROR" "从Cloudflare Workers下载的模块文件为空"
+            rm -f "$TEMP_DIR/modules.tar.gz.tmp"
+        fi
     # 尝试GitHub直连
-    elif output=$(curl -s -o "$TEMP_DIR/modules.tar.gz" "$GITHUB_RAW/modules.tar.gz" 2>&1); then
-        execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
-                   "模块解压成功" \
-                   "模块解压失败"
-        log "SUCCESS" "从GitHub直连下载并解压模块成功"
-        download_success=true
+    elif output=$(curl -s -S -o "$TEMP_DIR/modules.tar.gz.tmp" "$GITHUB_RAW/modules.tar.gz" 2>&1) && [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+        if [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+            mv "$TEMP_DIR/modules.tar.gz.tmp" "$TEMP_DIR/modules.tar.gz"
+            execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
+                       "模块解压成功" \
+                       "模块解压失败"
+            log "SUCCESS" "从GitHub直连下载并解压模块成功"
+            download_success=true
+        else
+            log "ERROR" "从GitHub直连下载的模块文件为空"
+            rm -f "$TEMP_DIR/modules.tar.gz.tmp"
+        fi
     # 尝试镜像站
-    elif output=$(curl -s -o "$TEMP_DIR/modules.tar.gz" "${MIRROR_URL}${GITHUB_RAW}/modules.tar.gz" 2>&1); then
-        execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
-                   "模块解压成功" \
-                   "模块解压失败"
-        log "SUCCESS" "从镜像站下载并解压模块成功"
-        download_success=true
+    elif output=$(curl -s -S -o "$TEMP_DIR/modules.tar.gz.tmp" "${MIRROR_URL}${GITHUB_RAW}/modules.tar.gz" 2>&1) && [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+        if [ -s "$TEMP_DIR/modules.tar.gz.tmp" ]; then
+            mv "$TEMP_DIR/modules.tar.gz.tmp" "$TEMP_DIR/modules.tar.gz"
+            execute_cmd "tar -xzf $TEMP_DIR/modules.tar.gz -C $INSTALL_DIR" \
+                       "模块解压成功" \
+                       "模块解压失败"
+            log "SUCCESS" "从镜像站下载并解压模块成功"
+            download_success=true
+        else
+            log "ERROR" "从镜像站下载的模块文件为空"
+            rm -f "$TEMP_DIR/modules.tar.gz.tmp"
+        fi
     fi
     
+    # 清理临时文件
+    rm -f "$TEMP_DIR/modules.tar.gz.tmp" "$TEMP_DIR/modules.tar.gz"
+    
     if [ "$download_success" = false ]; then
-        log "ERROR" "所有下载源均无法下载系统模块"
+        log "ERROR" "所有下载源均无法下载系统模块: $output"
         dialog --title "下载错误" --msgbox "下载错误: $output" 8 60
         exit 1
     fi
