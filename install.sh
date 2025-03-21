@@ -4,18 +4,18 @@
 # This script installs the ServerMaster system
 
 # 检测是否通过管道运行
-is_piped() {
-    [ -p /dev/stdin ]
-}
+# is_piped() {
+#     [ -p /dev/stdin ]
+# }
 
-# 如果是通过管道运行，先将脚本内容保存到临时文件再执行
-if is_piped; then
-    temp_script=$(mktemp /tmp/servermaster_install_XXXXXX.sh)
-    cat > "$temp_script"
-    chmod +x "$temp_script"
-    exec bash "$temp_script"
-    exit $?
-fi
+# # 如果是通过管道运行，先将脚本内容保存到临时文件再执行
+# if is_piped; then
+#     temp_script=$(mktemp /tmp/servermaster_install_XXXXXX.sh)
+#     cat > "$temp_script"
+#     chmod +x "$temp_script"
+#     exec bash "$temp_script"
+#     exit $?
+# fi
 
 # 检查 Dialog 是否已安装
 if ! command -v dialog &> /dev/null; then
