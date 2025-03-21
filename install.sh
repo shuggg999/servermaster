@@ -323,6 +323,14 @@ finalize() {
     echo "  运行命令: sm"
     echo "====================================================="
     echo ""
+    
+    # 自动启动main.sh
+    log "INFO" "正在启动 ServerMaster..."
+    if [ -f "$INSTALL_DIR/main.sh" ] && [ -x "$INSTALL_DIR/main.sh" ]; then
+        exec "$INSTALL_DIR/main.sh"
+    else
+        log "ERROR" "无法自动启动ServerMaster，请手动执行 'sm' 命令"
+    fi
 }
 
 # 主函数

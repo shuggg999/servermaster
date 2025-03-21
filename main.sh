@@ -439,35 +439,44 @@ show_main_menu() {
         case $choice in
             1) 
                 log_debug "选择了: 系统信息"
-                source "$MODULES_DIR/system/system_info.sh" 
+                source "$MODULES_DIR/system/system_info.sh"
+                # 暂停以便查看结果
+                dialog --title "操作完成" --msgbox "系统信息查看完成，按确定返回主菜单" 7 40 
                 ;;
             2) 
                 log_debug "选择了: 系统更新"
-                source "$MODULES_DIR/system/system_update.sh" 
+                source "$MODULES_DIR/system/system_update.sh"
+                dialog --title "操作完成" --msgbox "系统更新完成，按确定返回主菜单" 7 40 
                 ;;
             3) 
                 log_debug "选择了: 系统清理"
-                source "$MODULES_DIR/system/system_clean.sh" 
+                source "$MODULES_DIR/system/system_clean.sh"
+                dialog --title "操作完成" --msgbox "系统清理完成，按确定返回主菜单" 7 40 
                 ;;
             4) 
                 log_debug "选择了: BBR管理"
-                source "$MODULES_DIR/network/bbr_manager.sh" 
+                source "$MODULES_DIR/network/bbr_manager.sh"
+                dialog --title "操作完成" --msgbox "BBR管理操作完成，按确定返回主菜单" 7 40 
                 ;;
             5) 
                 log_debug "选择了: Docker管理"
-                source "$MODULES_DIR/application/docker_manager.sh" 
+                source "$MODULES_DIR/application/docker_manager.sh"
+                dialog --title "操作完成" --msgbox "Docker管理操作完成，按确定返回主菜单" 7 40 
                 ;;
             6) 
                 log_debug "选择了: 工作区管理"
-                source "$MODULES_DIR/special/workspace.sh" 
+                source "$MODULES_DIR/special/workspace.sh"
+                dialog --title "操作完成" --msgbox "工作区管理操作完成，按确定返回主菜单" 7 40 
                 ;;
             7) 
                 log_debug "选择了: 检查更新"
-                check_updates 
+                check_updates
+                dialog --title "操作完成" --msgbox "检查更新完成，按确定返回主菜单" 7 40 
                 ;;
             8) 
                 log_debug "选择了: 卸载系统"
                 uninstall_system
+                dialog --title "操作完成" --msgbox "卸载操作完成，按确定返回主菜单" 7 40 
                 ;;
             0) 
                 log_debug "选择了: 退出"
@@ -504,8 +513,10 @@ main() {
         read -p "按Enter键继续..." 
     fi
     
-    # 检查更新
+    # 检查更新后直接显示主菜单，防止意外跳转
+    log_debug "准备执行检查更新..."
     check_updates
+    log_debug "检查更新完成，准备显示主菜单..."
     
     # 显示主菜单
     if [ "$USE_TEXT_MODE" = false ]; then
