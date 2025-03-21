@@ -146,7 +146,7 @@ check_updates() {
         else
             echo "无法获取最新版本信息，请检查网络连接"
         fi
-        return
+        return 0
     fi
     
     # 清理版本号，确保只包含有效字符
@@ -199,7 +199,7 @@ check_updates() {
                 else
                     echo "无法下载安装脚本，更新失败"
                 fi
-                return
+                return 0
             fi
             
             # 设置可执行权限
@@ -243,6 +243,7 @@ check_updates() {
     fi
     
     log_debug "检查更新完成"
+    return 0
 }
 
 # 卸载系统
