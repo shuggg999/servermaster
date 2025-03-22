@@ -470,95 +470,97 @@ show_banner() {
 show_main_menu() {
     log_debug "显示主菜单"
     
-    if [ "$USE_TEXT_MODE" = true ]; then
-        # 文本模式菜单
-        echo "-- 主菜单 --"
-        echo "1. 系统信息 - 显示系统基本信息"
-        echo "2. 系统更新 - 更新系统及软件包"
-        echo "3. 系统清理 - 清理系统垃圾文件"
-        echo "4. BBR管理 - 安装/配置Google BBR"
-        echo "5. Docker管理 - 安装/管理Docker应用"
-        echo "6. 工作区管理 - 文件/目录操作" 
-        echo "7. 脚本更新 - 检查更新ServerMaster"
-        echo "8. 退出 - 退出脚本"
-        echo ""
-        echo -n "请输入选项 [1-8]: "
-        read choice
-    else
-        # Dialog菜单
-        local menu_height=20
-        local menu_width=70
-        local menu_items=8
-        
-        log_debug "创建Dialog菜单 (高度=${menu_height}, 宽度=${menu_width})"
-        
-        # Dialog需要一个临时文件存储结果
-        local temp_file=$(mktemp)
-        
-        # 创建Dialog菜单
-        dialog --clear --title "主菜单" \
-            --menu "请选择一个选项:" $menu_height $menu_width $menu_items \
-            "1" "系统信息 - 显示系统基本信息" \
-            "2" "系统更新 - 更新系统及软件包" \
-            "3" "系统清理 - 清理系统垃圾文件" \
-            "4" "BBR管理 - 安装/配置Google BBR" \
-            "5" "Docker管理 - 安装/管理Docker应用" \
-            "6" "工作区管理 - 文件/目录操作" \
-            "7" "脚本更新 - 检查更新ServerMaster" \
-            "8" "退出 - 退出脚本" 2> "$temp_file"
-        
-        # 获取Dialog退出状态和用户选择
-        local status=$?
-        log_debug "Dialog退出状态: $status"
-        
-        # 如果用户按了取消或ESC，则退出
-        if [ $status -ne 0 ]; then
-            log_debug "用户取消或按ESC键，退出程序"
-            rm -f "$temp_file"
-            clear
-            echo "感谢使用！"
-            exit 0
-        fi
-        
-        # 读取用户选择
-        choice=$(<"$temp_file")
-        log_debug "用户选择: $choice"
-        rm -f "$temp_file"
-    fi
-    
-    # 根据用户选择执行对应功能
-    case $choice in
-        1) execute_module "system/system_info.sh" ;;
-        2) execute_module "system/system_update.sh" ;;
-        3) execute_module "system/system_clean.sh" ;;
-        4) execute_module "network/bbr_manager.sh" ;;
-        5) execute_module "docker/docker_manager.sh" ;;
-        6) execute_module "file/workspace_manager.sh" ;;
-        7) check_updates ;;
-        8) 
-            if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "退出确认" --yesno "确定要退出吗？" 10 50
-                if [ $? -eq 0 ]; then
-                    clear
-                    echo "感谢使用！"
-                    exit 0
-                fi
-            else
+    while true; do
+        if [ "$USE_TEXT_MODE" = true ]; then
+            # 文本模式菜单
+            echo "-- 主菜单 --"
+            echo "1. 系统信息 - 显示系统基本信息"
+            echo "2. 系统更新 - 更新系统及软件包"
+            echo "3. 系统清理 - 清理系统垃圾文件"
+            echo "4. BBR管理 - 安装/配置Google BBR"
+            echo "5. Docker管理 - 安装/管理Docker应用"
+            echo "6. 工作区管理 - 文件/目录操作" 
+            echo "7. 脚本更新 - 检查更新ServerMaster"
+            echo "8. 退出 - 退出脚本"
+            echo ""
+            echo -n "请输入选项 [1-8]: "
+            read choice
+        else
+            # Dialog菜单
+            local menu_height=20
+            local menu_width=70
+            local menu_items=8
+            
+            log_debug "创建Dialog菜单 (高度=${menu_height}, 宽度=${menu_width})"
+            
+            # Dialog需要一个临时文件存储结果
+            local temp_file=$(mktemp)
+            
+            # 创建Dialog菜单
+            dialog --clear --title "主菜单" \
+                --menu "请选择一个选项:" $menu_height $menu_width $menu_items \
+                "1" "系统信息 - 显示系统基本信息" \
+                "2" "系统更新 - 更新系统及软件包" \
+                "3" "系统清理 - 清理系统垃圾文件" \
+                "4" "BBR管理 - 安装/配置Google BBR" \
+                "5" "Docker管理 - 安装/管理Docker应用" \
+                "6" "工作区管理 - 文件/目录操作" \
+                "7" "脚本更新 - 检查更新ServerMaster" \
+                "8" "退出 - 退出脚本" 2> "$temp_file"
+            
+            # 获取Dialog退出状态和用户选择
+            local status=$?
+            log_debug "Dialog退出状态: $status"
+            
+            # 如果用户按了取消或ESC，则退出
+            if [ $status -ne 0 ]; then
+                log_debug "用户取消或按ESC键，退出程序"
+                rm -f "$temp_file"
                 clear
                 echo "感谢使用！"
                 exit 0
             fi
-            ;;
-        *)
-            if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 10 50
-            else
-                echo "无效选项: $choice"
-                echo "请按Enter键继续..."
-                read
-            fi
-            ;;
-    esac
+            
+            # 读取用户选择
+            choice=$(<"$temp_file")
+            log_debug "用户选择: $choice"
+            rm -f "$temp_file"
+        fi
+        
+        # 根据用户选择执行对应功能
+        case $choice in
+            1) execute_module "system/system_info.sh" ;;
+            2) execute_module "system/system_update.sh" ;;
+            3) execute_module "system/system_clean.sh" ;;
+            4) execute_module "network/bbr_manager.sh" ;;
+            5) execute_module "docker/docker_manager.sh" ;;
+            6) execute_module "file/workspace_manager.sh" ;;
+            7) check_updates ;;
+            8) 
+                if [ "$USE_TEXT_MODE" = false ]; then
+                    dialog --title "退出确认" --yesno "确定要退出吗？" 10 50
+                    if [ $? -eq 0 ]; then
+                        clear
+                        echo "感谢使用！"
+                        exit 0
+                    fi
+                else
+                    clear
+                    echo "感谢使用！"
+                    exit 0
+                fi
+                ;;
+            *)
+                if [ "$USE_TEXT_MODE" = false ]; then
+                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 10 50
+                else
+                    echo "无效选项: $choice"
+                    echo "请按Enter键继续..."
+                    read
+                fi
+                ;;
+        esac
+    done
 }
 
 # 主函数
@@ -600,13 +602,11 @@ main() {
         show_text_menu
     fi
     
-    # 退出时的消息
-    if [ "$USE_TEXT_MODE" = false ]; then
-        dialog --title "再见" --msgbox "感谢使用 ServerMaster，再见！" 8 40
-    fi
-    clear
-    
+    # 理论上永远不会执行到这里，因为菜单函数中有无限循环
+    # 除非用户选择退出，那么会直接执行exit
     log_debug "脚本执行完毕"
+    clear
+    echo "感谢使用 ServerMaster，再见！"
 }
 
 # 启动程序
