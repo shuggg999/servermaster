@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# system_management模块菜单
+# 系统管理
 # 此脚本提供系统管理相关功能的菜单界面
 
 # 只在变量未定义时才设置安装目录
@@ -27,9 +27,6 @@ show_system_management_menu() {
         "2" "系统更新 - 更新系统及软件包"
         "3" "系统清理 - 清理系统垃圾文件"
         "4" "系统工具 - 环境配置与资源管理"
-        "5" "用户管理 - 用户添加/删除/权限管理"
-        "6" "性能优化 - 系统性能调优工具"
-        "7" "用户体验 - 命令行美化与工具"
         "0" "返回主菜单"
     )
     
@@ -43,21 +40,21 @@ show_system_management_menu() {
             echo "      系统管理菜单                                    "
             echo "====================================================="
             echo ""
-            echo "  1) 系统信息查询          5) 用户管理"
-            echo "  2) 系统更新              6) 性能优化"
-            echo "  3) 系统清理              7) 用户体验"
-            echo "  4) 系统工具              "
+            echo "  1) 系统信息查询"
+            echo "  2) 系统更新"
+            echo "  3) 系统清理"
+            echo "  4) 系统工具"
             echo ""
             echo "  0) 返回主菜单"
             echo ""
-            read -p "请选择操作 [0-7]: " choice
+            read -p "请选择操作 [0-4]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
             # 使用Dialog显示菜单，应用标准尺寸
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 8 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 5 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -73,9 +70,6 @@ show_system_management_menu() {
             2) execute_module "system_management/system_update.sh" ;;
             3) execute_module "system_management/system_clean.sh" ;;
             4) execute_module "system_management/system_tools.sh" ;;
-            5) execute_module "system_management/user_management.sh" ;;
-            6) execute_module "system_management/performance_optimization.sh" ;;
-            7) execute_module "system_management/user_experience.sh" ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
