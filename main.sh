@@ -15,6 +15,31 @@ SYSTEM_NAME="ServerMaster"
 # 获取版本号
 VERSION="1.0"
 
+# 定义窗口大小 - 以百分比形式表示终端大小
+DIALOG_MAX_HEIGHT=40
+DIALOG_MAX_WIDTH=140
+
+# 获取正确的dialog尺寸
+get_dialog_size() {
+    # 获取终端大小
+    local term_lines=$(tput lines 2>/dev/null || echo 24)
+    local term_cols=$(tput cols 2>/dev/null || echo 80)
+    
+    # 计算dialog窗口大小 (使用终端的85%)
+    local dialog_height=$((term_lines * 85 / 100))
+    local dialog_width=$((term_cols * 85 / 100))
+    
+    # 确保不超过最大值
+    [ "$dialog_height" -gt "$DIALOG_MAX_HEIGHT" ] && dialog_height=$DIALOG_MAX_HEIGHT
+    [ "$dialog_width" -gt "$DIALOG_MAX_WIDTH" ] && dialog_width=$DIALOG_MAX_WIDTH
+    
+    # 确保最小值
+    [ "$dialog_height" -lt 20 ] && dialog_height=20
+    [ "$dialog_width" -lt 70 ] && dialog_width=70
+    
+    echo "$dialog_height $dialog_width"
+}
+
 # 日志函数
 log_debug() {
     if [ "$DEBUG" = true ]; then
@@ -111,27 +136,6 @@ GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
 MIRROR_URL="https://mirror.ghproxy.com/"
 CF_PROXY_URL="https://install.ideapusher.cn/shuggg999/servermaster/main"
 
-# 获取适合的窗口大小
-get_window_size() {
-    # 获取终端大小
-    local term_height=$(tput lines 2>/dev/null || echo 24)
-    local term_width=$(tput cols 2>/dev/null || echo 80)
-    
-    log_debug "终端大小: $term_height x $term_width"
-    
-    # 默认使用80%的终端空间
-    local win_height=$((term_height * 80 / 100))
-    local win_width=$((term_width * 80 / 100))
-    
-    # 确保窗口尺寸在合理范围内
-    [ $win_height -lt 20 ] && win_height=20
-    [ $win_width -lt 70 ] && win_width=70
-    
-    log_debug "计算窗口大小: $win_height x $win_width"
-    
-    echo "${win_height} ${win_width}"
-}
-
 # 检查模块目录是否存在
 check_modules() {
     log_debug "检查模块目录"
@@ -155,7 +159,12 @@ check_updates() {
     log_debug "开始检查更新"
     
     if [ "$USE_TEXT_MODE" = false ]; then
-        dialog --title "检查更新" --infobox "正在检查更新..." 5 40
+        # 获取窗口大小
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        local small_height=5
+        local small_width=40
+        
+        dialog --title "检查更新" --infobox "正在检查更新..." $small_height $small_width
         sleep 1
     else
         echo "正在检查更新..."
@@ -171,28 +180,48 @@ check_updates() {
     # 尝试从不同源获取最新版本
     if latest_version=$(curl -s --connect-timeout 5 "$CF_PROXY_URL/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local info_height=10
+            local info_width=50
+            
+            dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" $info_height $info_width
         else
             echo "从 Cloudflare Workers 获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     elif latest_version=$(curl -s --connect-timeout 5 "$GITHUB_RAW/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local info_height=10
+            local info_width=50
+            
+            dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" $info_height $info_width
         else
             echo "从 GitHub 直连获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     elif latest_version=$(curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local info_height=10
+            local info_width=50
+            
+            dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" $info_height $info_width
         else
             echo "从镜像站获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     else
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local info_height=10
+            local info_width=50
+            
+            dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" $info_height $info_width
         else
             echo "无法获取最新版本信息，请检查网络连接"
         fi
@@ -206,7 +235,12 @@ check_updates() {
         local do_update=0
         
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local prompt_height=10
+            local prompt_width=50
+            
+            dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" $prompt_height $prompt_width
             do_update=$?
         else
             echo "发现新版本 $latest_version，当前版本 $VERSION"
@@ -221,7 +255,12 @@ check_updates() {
         
         if [ $do_update -eq 0 ]; then
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "更新中" --infobox "正在准备更新..." 5 40
+                # 获取窗口大小
+                read dialog_height dialog_width <<< $(get_dialog_size)
+                local small_height=5
+                local small_width=40
+                
+                dialog --title "更新中" --infobox "正在准备更新..." $small_height $small_width
             else
                 echo "正在准备更新..."
             fi
@@ -245,7 +284,12 @@ check_updates() {
                 update_cmd="/tmp/servermaster_install.sh"
             else
                 if [ "$USE_TEXT_MODE" = false ]; then
-                    dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" 10 50
+                    # 获取窗口大小
+                    read dialog_height dialog_width <<< $(get_dialog_size)
+                    local info_height=10
+                    local info_width=50
+                    
+                    dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" $info_height $info_width
                 else
                     echo "无法下载安装脚本，更新失败"
                 fi
@@ -257,7 +301,12 @@ check_updates() {
             
             # 显示更新日志
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" 10 50
+                # 获取窗口大小
+                read dialog_height dialog_width <<< $(get_dialog_size)
+                local info_height=10
+                local info_width=50
+                
+                dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" $info_height $info_width
             else
                 echo "即将开始更新"
                 echo "从版本: $VERSION"
@@ -286,7 +335,12 @@ check_updates() {
         fi
     else
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local info_height=10
+            local info_width=50
+            
+            dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" $info_height $info_width
         else
             echo "当前已是最新版本 $VERSION"
         fi
@@ -303,7 +357,12 @@ uninstall_system() {
     local confirm_uninstall=1
     
     if [ "$USE_TEXT_MODE" = false ]; then
-        dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" 10 50
+        # 获取窗口大小
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        local prompt_height=10
+        local prompt_width=50
+        
+        dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" $prompt_height $prompt_width
         confirm_uninstall=$?
     else
         echo "确定要卸载 ServerMaster 系统吗？"
@@ -323,7 +382,12 @@ uninstall_system() {
         local second_confirm=1
         
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local prompt_height=10
+            local prompt_width=50
+            
+            dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" $prompt_height $prompt_width
             second_confirm=$?
         else
             read -p "最后确认：真的要卸载 ServerMaster 吗？(y/n) " -n 1 -r
@@ -335,7 +399,12 @@ uninstall_system() {
         
         if [ $second_confirm -eq 0 ]; then
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." 5 40
+                # 获取窗口大小
+                read dialog_height dialog_width <<< $(get_dialog_size)
+                local small_height=5
+                local small_width=40
+                
+                dialog --title "卸载中" --infobox "正在卸载 ServerMaster..." $small_height $small_width
             else
                 echo "正在卸载 ServerMaster..."
             fi
@@ -352,7 +421,12 @@ uninstall_system() {
             rm -rf "/tmp/servermaster_*"
             
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" 10 50
+                # 获取窗口大小
+                read dialog_height dialog_width <<< $(get_dialog_size)
+                local info_height=10
+                local info_width=50
+                
+                dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" $info_height $info_width
             else
                 echo "ServerMaster 已成功卸载！"
             fi
@@ -392,7 +466,12 @@ execute_module() {
             echo "按Enter键继续..."
             read
         else
-            dialog --title "错误" --msgbox "模块不存在: $module_path\n请检查安装是否完整" 10 50
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            local error_height=10
+            local error_width=50
+            
+            dialog --title "错误" --msgbox "模块不存在: $module_path\n请检查安装是否完整" $error_height $error_width
         fi
     fi
 }
@@ -452,6 +531,9 @@ show_banner() {
     log_debug "显示横幅，系统名称: $system_name"
     
     if [ "$USE_TEXT_MODE" = false ]; then
+        # 获取窗口大小
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
         # 使用Dialog显示横幅
         dialog --title "欢迎" --msgbox "\n    欢迎使用 $system_name 系统\n    版本: $VERSION\n\n    一个简单而强大的服务器管理工具\n" 10 50
     else
@@ -486,19 +568,17 @@ show_main_menu() {
             echo -n "请输入选项 [1-8]: "
             read choice
         else
-            # Dialog菜单
-            local menu_height=20
-            local menu_width=70
-            local menu_items=8
+            # 获取窗口大小
+            read dialog_height dialog_width <<< $(get_dialog_size)
             
-            log_debug "创建Dialog菜单 (高度=${menu_height}, 宽度=${menu_width})"
+            log_debug "创建Dialog菜单 (高度=${dialog_height}, 宽度=${dialog_width})"
             
             # Dialog需要一个临时文件存储结果
             local temp_file=$(mktemp)
             
             # 创建Dialog菜单
             dialog --clear --title "主菜单" \
-                --menu "请选择一个选项:" $menu_height $menu_width $menu_items \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 8 \
                 "1" "系统信息 - 显示系统基本信息" \
                 "2" "系统更新 - 更新系统及软件包" \
                 "3" "系统清理 - 清理系统垃圾文件" \
@@ -538,7 +618,12 @@ show_main_menu() {
             7) check_updates ;;
             8) 
                 if [ "$USE_TEXT_MODE" = false ]; then
-                    dialog --title "退出确认" --yesno "确定要退出吗？" 10 50
+                    # 获取窗口大小
+                    read exit_height exit_width <<< $(get_dialog_size)
+                    exit_height=10
+                    exit_width=50
+                    
+                    dialog --title "退出确认" --yesno "确定要退出吗？" $exit_height $exit_width
                     if [ $? -eq 0 ]; then
                         clear
                         echo "感谢使用！"
@@ -552,7 +637,12 @@ show_main_menu() {
                 ;;
             *)
                 if [ "$USE_TEXT_MODE" = false ]; then
-                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 10 50
+                    # 获取窗口大小
+                    read error_height error_width <<< $(get_dialog_size)
+                    error_height=10
+                    error_width=50
+                    
+                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" $error_height $error_width
                 else
                     echo "无效选项: $choice"
                     echo "请按Enter键继续..."
