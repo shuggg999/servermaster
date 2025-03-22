@@ -15,7 +15,7 @@ show_system_tools_menu() {
     local title="系统工具"
     local menu_items=(
         "1" "环境与配置管理 - 系统环境配置"
-        "2" "资源管理 - 端口和资源管理"
+        "2" "资源管理 - 端口与资源管理"
         "0" "返回上级菜单"
     )
     
@@ -26,20 +26,20 @@ show_system_tools_menu() {
             echo "      系统工具菜单                                    "
             echo "====================================================="
             echo ""
-            echo "  1) 环境与配置管理          "
-            echo "  2) 资源管理                "
+            echo "  1) 环境与配置管理"
+            echo "  2) 资源管理"
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
             read -p "请选择操作 [0-2]: " choice
         else
-            # 使用Dialog显示菜单
-            choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 3 \
-                "${menu_items[@]}" 2>&1 >/dev/tty)
+            # 使用Dialog规则来显示菜单
+            local result=$(show_menu_dialog "$title" "请选择一个选项:" 3 "${menu_items[@]}")
+            local choice=$(echo "$result" | cut -d'|' -f1)
+            local status=$(echo "$result" | cut -d'|' -f2)
             
             # 检查是否按下ESC或Cancel
-            if [ $? -ne 0 ]; then
+            if [ "$status" -ne 0 ]; then
                 return
             fi
         fi
@@ -53,7 +53,7 @@ show_system_tools_menu() {
                     echo "无效选择，请重试"
                     sleep 1
                 else
-                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 8 40
+                    show_error_dialog "错误" "无效选项: $choice\n请重新选择"
                 fi
                 ;;
         esac

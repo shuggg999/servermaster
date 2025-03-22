@@ -6,6 +6,7 @@
 # 获取安装目录
 INSTALL_DIR="$(dirname $(dirname $(dirname $(readlink -f $0))))"
 MODULES_DIR="$INSTALL_DIR/modules"
+CONFIG_DIR="$INSTALL_DIR/config"
 
 # 导入共享函数
 source "$INSTALL_DIR/main.sh"
@@ -40,13 +41,13 @@ show_system_management_menu() {
             echo ""
             read -p "请选择操作 [0-7]: " choice
         else
-            # 使用Dialog显示菜单
-            choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 8 \
-                "${menu_items[@]}" 2>&1 >/dev/tty)
+            # 使用Dialog规则来显示菜单
+            local result=$(show_menu_dialog "$title" "请选择一个选项:" 8 "${menu_items[@]}")
+            local choice=$(echo "$result" | cut -d'|' -f1)
+            local status=$(echo "$result" | cut -d'|' -f2)
             
             # 检查是否按下ESC或Cancel
-            if [ $? -ne 0 ]; then
+            if [ "$status" -ne 0 ]; then
                 return
             fi
         fi
@@ -65,17 +66,10 @@ show_system_management_menu() {
                     echo "无效选择，请重试"
                     sleep 1
                 else
-                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 8 40
+                    show_error_dialog "错误" "无效选项: $choice\n请重新选择"
                 fi
                 ;;
         esac
-        
-        # 文本模式下，显示按键提示
-        if [ "$USE_TEXT_MODE" = true ]; then
-            echo ""
-            echo "按Enter键继续..."
-            read
-        fi
     done
 }
 

@@ -57,6 +57,14 @@ log_success() {
     echo -e "\033[32m[SUCCESS]\033[0m $1" >&2
 }
 
+# 导入对话框规则
+if [ -f "$CONFIG_DIR/dialog_rules.sh" ]; then
+    source "$CONFIG_DIR/dialog_rules.sh"
+    log_debug "已导入对话框规则"
+else
+    log_debug "对话框规则文件不存在: $CONFIG_DIR/dialog_rules.sh"
+fi
+
 # 检查脚本运行环境并记录信息
 check_environment() {
     local log_file="$INSTALL_DIR/logs/environment.log"
@@ -445,10 +453,15 @@ execute_module() {
     local module_path="$1"
     local full_path="$MODULES_DIR/$module_path"
     
+    # 保存当前工作目录
+    local current_dir=$(pwd)
+    
     log_debug "尝试执行模块: $full_path"
     
     if [ -f "$full_path" ]; then
         log_debug "模块存在，执行中..."
+        # 切换到安装目录再执行，确保相对路径正确
+        cd "$INSTALL_DIR"
         source "$full_path"
         
         if [ "$USE_TEXT_MODE" = true ]; then
@@ -474,6 +487,9 @@ execute_module() {
             dialog --title "错误" --msgbox "模块不存在: $module_path\n请检查安装是否完整" $error_height $error_width
         fi
     fi
+    
+    # 恢复原来的工作目录
+    cd "$current_dir"
 }
 
 # 文本模式的菜单
