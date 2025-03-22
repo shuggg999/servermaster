@@ -3,6 +3,17 @@
 # ServerMaster Main Script
 # This script serves as the main entry point for the ServerMaster system
 
+# 防止重复执行
+if [ -n "$SERVERMASTER_LOADED" ]; then
+    return 0
+fi
+export SERVERMASTER_LOADED=true
+
+# 安装路径 - 把这些变量定义提前到脚本顶部
+INSTALL_DIR="/usr/local/servermaster"
+MODULES_DIR="$INSTALL_DIR/modules"
+CONFIG_DIR="$INSTALL_DIR/config"
+
 # 开启调试模式，帮助排查问题
 DEBUG=true
 # DEBUG=false
@@ -124,11 +135,6 @@ if ! command -v dialog &> /dev/null; then
 fi
 
 log_debug "Dialog检查完成: USE_TEXT_MODE=$USE_TEXT_MODE"
-
-# 安装路径
-INSTALL_DIR="/usr/local/servermaster"
-MODULES_DIR="$INSTALL_DIR/modules"
-CONFIG_DIR="$INSTALL_DIR/config"
 
 log_debug "设置目录: INSTALL_DIR=$INSTALL_DIR"
 
