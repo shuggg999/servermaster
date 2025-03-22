@@ -88,7 +88,8 @@ show_menu_dialog() {
     local title="$1"
     local prompt="$2"
     local menu_height="$3"
-    local menu_items=("${@:4}")
+    shift 3
+    local menu_items=("$@")
     
     # 获取窗口大小
     read dialog_height dialog_width <<< $(get_dialog_size)
@@ -96,16 +97,10 @@ show_menu_dialog() {
     # 创建临时文件存储选择结果
     local temp_file=$(mktemp)
     
-    # 构建菜单项
-    local menu_args=()
-    for ((i=0; i<${#menu_items[@]}; i+=2)); do
-        menu_args+=("${menu_items[$i]}" "${menu_items[$((i+1))]}")
-    done
-    
     # 显示菜单
     dialog --clear --title "$title" \
            --menu "$prompt" $dialog_height $dialog_width $menu_height \
-           "${menu_args[@]}" 2> "$temp_file"
+           "${menu_items[@]}" 2> "$temp_file"
     
     # 获取退出状态
     local status=$?
