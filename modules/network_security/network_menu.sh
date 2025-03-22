@@ -1,16 +1,22 @@
 #!/bin/bash
 
-# network_security模块菜单
+# 网络与安全
 # 此脚本提供网络与安全相关功能的菜单界面
 
-# 获取安装目录
-INSTALL_DIR="$(dirname $(dirname $(dirname $(readlink -f $0))))"
-MODULES_DIR="$INSTALL_DIR/modules"
+# 只在变量未定义时才设置安装目录
+if [ -z "$INSTALL_DIR" ]; then
+    INSTALL_DIR="$(dirname $(dirname $(dirname $(readlink -f $0))))"
+    MODULES_DIR="$INSTALL_DIR/modules"
+    CONFIG_DIR="$INSTALL_DIR/config"
+    
+    # 导入共享函数
+    source "$INSTALL_DIR/main.sh"
+fi
 
-# 导入共享函数
-source "$INSTALL_DIR/main.sh"
+# 保存当前目录
+CURRENT_DIR="$(pwd)"
 
-# 显示菜单
+# 显示网络安全菜单
 show_network_security_menu() {
     local title="网络与安全"
     local menu_items=(
@@ -22,14 +28,17 @@ show_network_security_menu() {
         "6" "系统监控预警 - TG-bot监控"
         "7" "安全工具 - 漏洞修复与病毒扫描"
         "8" "本机host解析 - 管理hosts文件"
-        "0" "返回上级菜单"
+        "0" "返回主菜单"
     )
     
     while true; do
+        # 确保我们在正确的目录
+        cd "$INSTALL_DIR"
+        
         if [ "$USE_TEXT_MODE" = true ]; then
             clear
             echo "====================================================="
-            echo "      网络与安全菜单                                  "
+            echo "      网络与安全菜单                                   "
             echo "====================================================="
             echo ""
             echo "  1) 防火墙管理              5) SSH防御程序"
@@ -37,7 +46,7 @@ show_network_security_menu() {
             echo "  3) WARP管理               7) 安全工具"
             echo "  4) VPN与代理服务          8) 本机host解析"
             echo ""
-            echo "  0) 返回上级菜单"
+            echo "  0) 返回主菜单"
             echo ""
             read -p "请选择操作 [0-8]: " choice
         else
@@ -47,7 +56,9 @@ show_network_security_menu() {
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
-            if [ $? -ne 0 ]; then
+            local status=$?
+            if [ $status -ne 0 ]; then
+                cd "$CURRENT_DIR"  # 恢复原始目录
                 return
             fi
         fi
@@ -61,7 +72,10 @@ show_network_security_menu() {
             6) execute_module "network_security/system_monitoring.sh" ;;
             7) execute_module "network_security/security_tools.sh" ;;
             8) execute_module "network_security/hosts_manager.sh" ;;
-            0) return ;;
+            0) 
+                cd "$CURRENT_DIR"  # 恢复原始目录
+                return 
+                ;;
             *) 
                 if [ "$USE_TEXT_MODE" = true ]; then
                     echo "无效选择，请重试"
@@ -82,4 +96,7 @@ show_network_security_menu() {
 }
 
 # 运行菜单
-show_network_security_menu 
+show_network_security_menu
+
+# 确保在脚本结束时恢复原始目录
+cd "$CURRENT_DIR" 

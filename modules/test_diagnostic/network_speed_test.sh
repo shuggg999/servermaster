@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 环境与配置管理
-# 此脚本提供环境配置相关功能的菜单界面
+# 网络线路测速
+# 此脚本提供各种网络延迟、路由和速度测试功能
 
 # 只在变量未定义时才设置安装目录
 if [ -z "$INSTALL_DIR" ]; then
@@ -16,14 +16,17 @@ fi
 # 保存当前目录
 CURRENT_DIR="$(pwd)"
 
-# 显示环境配置菜单
-show_env_config_menu() {
-    local title="环境与配置管理"
+# 显示网络线路测速菜单
+show_network_speed_test_menu() {
+    local title="网络线路测速"
     local menu_items=(
-        "1" "系统环境变量配置 - 管理系统环境变量"
-        "2" "应用配置文件管理 - 管理应用配置文件"
-        "3" "SSH服务配置 - 配置SSH服务安全选项"
-        "4" "系统编码设置 - 配置系统字符编码"
+        "1" "besttrace三网回程延迟路由测试 - 电信/联通/移动回程分析"
+        "2" "mtr_trace三网回程线路测试 - 详细路由跟踪测试" 
+        "3" "Superspeed三网测速 - 全国节点速度测试"
+        "4" "nxtrace快速回程测试脚本 - 快速测试回程路由"
+        "5" "nxtrace指定IP回程测试脚本 - 测试特定IP回程"
+        "6" "ludashi2020三网线路测试 - 全方位网络测试"
+        "7" "i-abc多功能测速脚本 - 综合测速和系统信息"
         "0" "返回上级菜单"
     )
     
@@ -34,21 +37,21 @@ show_env_config_menu() {
         if [ "$USE_TEXT_MODE" = true ]; then
             clear
             echo "====================================================="
-            echo "      环境与配置管理菜单                             "
+            echo "      网络线路测速菜单                               "
             echo "====================================================="
             echo ""
-            echo "  1) 系统环境变量配置"
-            echo "  2) 应用配置文件管理"
-            echo "  3) SSH服务配置"
-            echo "  4) 系统编码设置"
+            echo "  1) besttrace三网回程延迟路由测试     5) nxtrace指定IP回程测试脚本"
+            echo "  2) mtr_trace三网回程线路测试         6) ludashi2020三网线路测试"
+            echo "  3) Superspeed三网测速                7) i-abc多功能测速脚本"
+            echo "  4) nxtrace快速回程测试脚本"
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
-            read -p "请选择操作 [0-4]: " choice
+            read -p "请选择操作 [0-7]: " choice
         else
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 5 \
+                --menu "请选择一个选项:" 18 70 8 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -60,10 +63,13 @@ show_env_config_menu() {
         fi
         
         case $choice in
-            1) echo "系统环境变量配置功能未实现" ;;
-            2) echo "应用配置文件管理功能未实现" ;;
-            3) echo "SSH服务配置功能未实现" ;;
-            4) echo "系统编码设置功能未实现" ;;
+            1) execute_module "test_diagnostic/tests/besttrace_test.sh" ;;
+            2) execute_module "test_diagnostic/tests/mtr_trace_test.sh" ;;
+            3) execute_module "test_diagnostic/tests/superspeed_test.sh" ;;
+            4) execute_module "test_diagnostic/tests/nxtrace_quick_test.sh" ;;
+            5) execute_module "test_diagnostic/tests/nxtrace_ip_test.sh" ;;
+            6) execute_module "test_diagnostic/tests/ludashi_test.sh" ;;
+            7) execute_module "test_diagnostic/tests/iabc_test.sh" ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
@@ -88,7 +94,7 @@ show_env_config_menu() {
 }
 
 # 运行菜单
-show_env_config_menu
+show_network_speed_test_menu
 
 # 确保在脚本结束时恢复原始目录
-cd "$CURRENT_DIR" 
+cd "$CURRENT_DIR"

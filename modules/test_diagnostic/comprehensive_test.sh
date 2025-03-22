@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 集群管理
-# 此脚本提供集群管理相关功能的菜单界面
+# 综合性测试
+# 此脚本提供全面系统评估功能
 
 # 只在变量未定义时才设置安装目录
 if [ -z "$INSTALL_DIR" ]; then
@@ -16,14 +16,13 @@ fi
 # 保存当前目录
 CURRENT_DIR="$(pwd)"
 
-# 显示集群管理菜单
-show_cluster_management_menu() {
-    local title="集群管理"
+# 显示综合性测试菜单
+show_comprehensive_test_menu() {
+    local title="综合性测试"
     local menu_items=(
-        "1" "服务器列表管理 - 添加/删除/编辑服务器"
-        "2" "批量执行任务 - 批量管理服务器"
-        "3" "集群备份与还原 - 集群数据备份管理"
-        "0" "返回主菜单"
+        "1" "bench性能测试 - 系统综合性能评测"
+        "2" "spiritysdx融合怪测评 - 全方位系统与网络测评"
+        "0" "返回上级菜单"
     )
     
     while true; do
@@ -33,20 +32,19 @@ show_cluster_management_menu() {
         if [ "$USE_TEXT_MODE" = true ]; then
             clear
             echo "====================================================="
-            echo "      集群管理菜单                                    "
+            echo "      综合性测试菜单                                 "
             echo "====================================================="
             echo ""
-            echo "  1) 服务器列表管理          "
-            echo "  2) 批量执行任务            "
-            echo "  3) 集群备份与还原          "
+            echo "  1) bench性能测试"
+            echo "  2) spiritysdx融合怪测评"
             echo ""
-            echo "  0) 返回主菜单"
+            echo "  0) 返回上级菜单"
             echo ""
-            read -p "请选择操作 [0-3]: " choice
+            read -p "请选择操作 [0-2]: " choice
         else
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 4 \
+                --menu "请选择一个选项:" 15 60 3 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -58,9 +56,8 @@ show_cluster_management_menu() {
         fi
         
         case $choice in
-            1) execute_module "cluster_management/server_list.sh" ;;
-            2) execute_module "cluster_management/batch_tasks.sh" ;;
-            3) execute_module "cluster_management/cluster_backup.sh" ;;
+            1) execute_module "test_diagnostic/tests/bench_test.sh" ;;
+            2) execute_module "test_diagnostic/tests/spiritysdx_test.sh" ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
@@ -85,7 +82,7 @@ show_cluster_management_menu() {
 }
 
 # 运行菜单
-show_cluster_management_menu
+show_comprehensive_test_menu
 
 # 确保在脚本结束时恢复原始目录
 cd "$CURRENT_DIR" 

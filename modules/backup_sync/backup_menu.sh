@@ -1,16 +1,22 @@
 #!/bin/bash
 
-# backup_sync模块菜单
+# 备份与同步
 # 此脚本提供备份与同步相关功能的菜单界面
 
-# 获取安装目录
-INSTALL_DIR="$(dirname $(dirname $(dirname $(readlink -f $0))))"
-MODULES_DIR="$INSTALL_DIR/modules"
+# 只在变量未定义时才设置安装目录
+if [ -z "$INSTALL_DIR" ]; then
+    INSTALL_DIR="$(dirname $(dirname $(dirname $(readlink -f $0))))"
+    MODULES_DIR="$INSTALL_DIR/modules"
+    CONFIG_DIR="$INSTALL_DIR/config"
+    
+    # 导入共享函数
+    source "$INSTALL_DIR/main.sh"
+fi
 
-# 导入共享函数
-source "$INSTALL_DIR/main.sh"
+# 保存当前目录
+CURRENT_DIR="$(pwd)"
 
-# 显示菜单
+# 显示备份与同步菜单
 show_backup_sync_menu() {
     local title="备份与同步"
     local menu_items=(
@@ -18,20 +24,23 @@ show_backup_sync_menu() {
         "2" "定时任务管理 - 设置定时备份"
         "3" "SSH远程连接工具 - 管理远程连接"
         "4" "Rsync远程同步工具 - 文件同步工具"
-        "0" "返回上级菜单"
+        "0" "返回主菜单"
     )
     
     while true; do
+        # 确保我们在正确的目录
+        cd "$INSTALL_DIR"
+        
         if [ "$USE_TEXT_MODE" = true ]; then
             clear
             echo "====================================================="
-            echo "      备份与同步菜单                                  "
+            echo "      备份与同步菜单                                   "
             echo "====================================================="
             echo ""
             echo "  1) 系统备份与恢复          3) SSH远程连接工具"
             echo "  2) 定时任务管理            4) Rsync远程同步工具"
             echo ""
-            echo "  0) 返回上级菜单"
+            echo "  0) 返回主菜单"
             echo ""
             read -p "请选择操作 [0-4]: " choice
         else
@@ -41,7 +50,9 @@ show_backup_sync_menu() {
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
-            if [ $? -ne 0 ]; then
+            local status=$?
+            if [ $status -ne 0 ]; then
+                cd "$CURRENT_DIR"  # 恢复原始目录
                 return
             fi
         fi
@@ -51,7 +62,10 @@ show_backup_sync_menu() {
             2) execute_module "backup_sync/cron_tasks.sh" ;;
             3) execute_module "backup_sync/ssh_tools.sh" ;;
             4) execute_module "backup_sync/rsync_tools.sh" ;;
-            0) return ;;
+            0) 
+                cd "$CURRENT_DIR"  # 恢复原始目录
+                return 
+                ;;
             *) 
                 if [ "$USE_TEXT_MODE" = true ]; then
                     echo "无效选择，请重试"
@@ -72,4 +86,7 @@ show_backup_sync_menu() {
 }
 
 # 运行菜单
-show_backup_sync_menu 
+show_backup_sync_menu
+
+# 确保在脚本结束时恢复原始目录
+cd "$CURRENT_DIR" 

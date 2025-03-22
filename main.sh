@@ -471,6 +471,8 @@ execute_module() {
         log_debug "模块存在，执行中..."
         # 切换到安装目录再执行，确保相对路径正确
         cd "$INSTALL_DIR"
+        log_debug "切换到安装目录: $INSTALL_DIR"
+        
         # 使用绝对路径执行模块
         source "$full_path"
         
@@ -479,17 +481,19 @@ execute_module() {
         log_debug "模块执行完成，已恢复工作目录: $(pwd)"
         
         if [ "$USE_TEXT_MODE" = true ]; then
-    echo ""
+            echo ""
             echo "模块执行完成，按Enter键返回主菜单..."
             read
         fi
     else
         log_error "模块不存在: $full_path (当前目录: $current_dir)"
+        log_debug "INSTALL_DIR=$INSTALL_DIR"
+        log_debug "MODULES_DIR=$MODULES_DIR"
         
         if [ "$USE_TEXT_MODE" = true ]; then
             echo "错误: 模块不存在 ($module_path)"
             echo "请检查安装是否完整"
-    echo ""
+            echo ""
             echo "按Enter键继续..."
             read
         else
