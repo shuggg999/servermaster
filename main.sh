@@ -135,8 +135,7 @@ check_modules() {
         log_error "模块目录不存在: $MODULES_DIR"
         
         if [ "$USE_TEXT_MODE" = false ]; then
-            local window_size=($(get_window_size))
-            dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" ${window_size[0]} ${window_size[1]}
+            dialog --title "错误" --msgbox "模块目录不存在，请重新安装系统！" 10 50
         else
             echo "错误: 模块目录不存在，请重新安装系统！"
         fi
@@ -151,7 +150,6 @@ check_updates() {
     log_debug "开始检查更新"
     
     if [ "$USE_TEXT_MODE" = false ]; then
-        local window_size=($(get_window_size))
         dialog --title "检查更新" --infobox "正在检查更新..." 5 40
         sleep 1
     else
@@ -168,28 +166,28 @@ check_updates() {
     # 尝试从不同源获取最新版本
     if latest_version=$(curl -s --connect-timeout 5 "$CF_PROXY_URL/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+            dialog --title "版本信息" --msgbox "从 Cloudflare Workers 获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
         else
             echo "从 Cloudflare Workers 获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     elif latest_version=$(curl -s --connect-timeout 5 "$GITHUB_RAW/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+            dialog --title "版本信息" --msgbox "从 GitHub 直连获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
         else
             echo "从 GitHub 直连获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     elif latest_version=$(curl -s --connect-timeout 5 "${MIRROR_URL}${GITHUB_RAW}/version.txt" 2>/dev/null) && [ ! -z "$latest_version" ]; then
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" ${window_size[0]} ${window_size[1]}
+            dialog --title "版本信息" --msgbox "从镜像站获取到最新版本: $latest_version\n当前版本: $VERSION" 10 50
         else
             echo "从镜像站获取到最新版本: $latest_version"
             echo "当前版本: $VERSION"
         fi
     else
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" ${window_size[0]} ${window_size[1]}
+            dialog --title "检查更新" --msgbox "无法获取最新版本信息，请检查网络连接" 10 50
         else
             echo "无法获取最新版本信息，请检查网络连接"
         fi
@@ -203,7 +201,7 @@ check_updates() {
         local do_update=0
         
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" ${window_size[0]} ${window_size[1]}
+            dialog --title "发现新版本" --yesno "发现新版本 $latest_version，当前版本 $VERSION，是否更新？" 10 50
             do_update=$?
         else
             echo "发现新版本 $latest_version，当前版本 $VERSION"
@@ -242,7 +240,7 @@ check_updates() {
                 update_cmd="/tmp/servermaster_install.sh"
             else
                 if [ "$USE_TEXT_MODE" = false ]; then
-                    dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" ${window_size[0]} ${window_size[1]}
+                    dialog --title "更新失败" --msgbox "无法下载安装脚本，更新失败" 10 50
                 else
                     echo "无法下载安装脚本，更新失败"
                 fi
@@ -254,7 +252,7 @@ check_updates() {
             
             # 显示更新日志
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" ${window_size[0]} ${window_size[1]}
+                dialog --title "更新信息" --msgbox "即将开始更新\n\n从版本: $VERSION\n更新到: $latest_version\n\n请确保网络通畅" 10 50
             else
                 echo "即将开始更新"
                 echo "从版本: $VERSION"
@@ -283,7 +281,7 @@ check_updates() {
         fi
     else
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" ${window_size[0]} ${window_size[1]}
+            dialog --title "检查更新" --msgbox "当前已是最新版本 $VERSION" 10 50
         else
             echo "当前已是最新版本 $VERSION"
         fi
@@ -300,8 +298,7 @@ uninstall_system() {
     local confirm_uninstall=1
     
     if [ "$USE_TEXT_MODE" = false ]; then
-        local window_size=($(get_window_size))
-        dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" ${window_size[0]} ${window_size[1]}
+        dialog --title "卸载确认" --yesno "确定要卸载 ServerMaster 系统吗？\n\n此操作将删除：\n- 所有脚本和模块\n- 配置文件\n- 系统命令\n\n此操作不可恢复！" 10 50
         confirm_uninstall=$?
     else
         echo "确定要卸载 ServerMaster 系统吗？"
@@ -321,7 +318,7 @@ uninstall_system() {
         local second_confirm=1
         
         if [ "$USE_TEXT_MODE" = false ]; then
-            dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" ${window_size[0]} ${window_size[1]}
+            dialog --title "二次确认" --yesno "最后确认：真的要卸载 ServerMaster 吗？" 10 50
             second_confirm=$?
         else
             read -p "最后确认：真的要卸载 ServerMaster 吗？(y/n) " -n 1 -r
@@ -350,7 +347,7 @@ uninstall_system() {
             rm -rf "/tmp/servermaster_*"
             
             if [ "$USE_TEXT_MODE" = false ]; then
-                dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" ${window_size[0]} ${window_size[1]}
+                dialog --title "卸载完成" --msgbox "ServerMaster 已成功卸载！" 10 50
             else
                 echo "ServerMaster 已成功卸载！"
             fi
@@ -437,171 +434,118 @@ show_text_menu() {
     exit 0
 }
 
-# 显示主菜单（两列布局，使用方向键选择）
-show_main_menu() {
-    log_debug "显示Dialog模式菜单"
-
-    # 使用固定窗口大小
-    local win_height=18
-    local win_width=70
+# 显示横幅
+show_banner() {
+    local width=70
+    local center_padding=$(( (width - ${#SYSTEM_NAME}) / 2 ))
+    local version_padding=$(( (width - ${#VERSION} - 9) / 2 ))
     
-    # 调试窗口大小
-    log_debug "菜单窗口大小: ${win_height}x${win_width}"
-    
-    # 检查Dialog是否可用
-    if ! command -v dialog &> /dev/null; then
-        log_error "Dialog未安装，请先安装Dialog"
-        echo "错误: Dialog未安装，请先安装Dialog"
-        exit 1
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo ""
+        echo $(printf "%${width}s" | tr " " "-")
+        echo "$(printf "%${center_padding}s")$SYSTEM_NAME"
+        echo "$(printf "%${version_padding}s")版本: $VERSION"
+        echo $(printf "%${width}s" | tr " " "-")
+        echo ""
+    else
+        local message="$SYSTEM_NAME\n\n版本: $VERSION"
+        dialog --title "欢迎使用" --msgbox "$message" 10 50
     fi
+}
+
+# 显示主菜单
+show_main_menu() {
+    log_debug "显示主菜单"
     
-    # 确保Dialog可正常工作
-    dialog_version=$(dialog --version 2>&1 | head -n 1)
-    log_debug "使用的Dialog版本: $dialog_version"
-    
-    # 创建日志目录
-    mkdir -p "$INSTALL_DIR/logs"
-    debug_log="$INSTALL_DIR/logs/menu_debug.log"
-    
-    # 记录调试信息
-    echo "====== 菜单调试信息 $(date) ======" > "$debug_log"
-    echo "终端大小: $(tput lines)x$(tput cols)" >> "$debug_log"
-    echo "菜单窗口大小: ${win_height}x${win_width}" >> "$debug_log"
-    echo "Dialog版本: $dialog_version" >> "$debug_log"
-    
-    # 设置菜单标题和菜单项
-    local menu_title="ServerMaster 主菜单 (v$VERSION)"
-    
-    # 使用菜单参数
-    local menu_height=$win_height
-    local menu_width=$win_width
-    local menu_items=9
-    
-    while true; do
-        # 创建单个菜单，使用简洁的布局
-        echo "准备显示主菜单..." >> "$debug_log"
+    if [ "$USE_TEXT_MODE" = true ]; then
+        # 文本模式菜单
+        echo "-- 主菜单 --"
+        echo "1. 系统信息 - 显示系统基本信息"
+        echo "2. 系统更新 - 更新系统及软件包"
+        echo "3. 系统清理 - 清理系统垃圾文件"
+        echo "4. BBR管理 - 安装/配置Google BBR"
+        echo "5. Docker管理 - 安装/管理Docker应用"
+        echo "6. 工作区管理 - 文件/目录操作" 
+        echo "7. 脚本更新 - 检查更新ServerMaster"
+        echo "8. 退出 - 退出脚本"
+        echo ""
+        echo -n "请输入选项 [1-8]: "
+        read choice
+    else
+        # Dialog菜单
+        local menu_height=20
+        local menu_width=70
+        local menu_items=8
         
-        # 使用临时文件存储菜单输出
-        local tmp_file=$(mktemp)
+        log_debug "创建Dialog菜单 (高度=${menu_height}, 宽度=${menu_width})"
         
-        export DIALOGRC=/dev/null  # 避免配置文件影响
+        # Dialog需要一个临时文件存储结果
+        local temp_file=$(mktemp)
         
-        # 使用更简单的菜单格式 - 顶部添加分隔线
-        dialog --clear --no-cancel \
-               --title "$menu_title" \
-               --backtitle "ServerMaster v$VERSION" \
-               --menu "\n系统管理                        网络与应用\n----------------------------------------\n请选择一个选项:" $menu_height $menu_width $menu_items \
-               "1" "系统信息 - 查看服务器详细信息" \
-               "2" "系统更新 - 更新系统软件包" \
-               "3" "系统清理 - 清理系统临时文件" \
-               "4" "BBR管理 - TCP加速管理" \
-               "5" "Docker管理 - 容器应用管理" \
-               "6" "工作区管理 - 管理工作区" \
-               "7" "检查更新 - 检查脚本更新" \
-               "8" "卸载系统 - 卸载ServerMaster" \
-               "0" "退出系统" 2>"$tmp_file"
+        # 创建Dialog菜单
+        dialog --clear --title "主菜单" \
+            --menu "请选择一个选项:" $menu_height $menu_width $menu_items \
+            "1" "系统信息 - 显示系统基本信息" \
+            "2" "系统更新 - 更新系统及软件包" \
+            "3" "系统清理 - 清理系统垃圾文件" \
+            "4" "BBR管理 - 安装/配置Google BBR" \
+            "5" "Docker管理 - 安装/管理Docker应用" \
+            "6" "工作区管理 - 文件/目录操作" \
+            "7" "脚本更新 - 检查更新ServerMaster" \
+            "8" "退出 - 退出脚本" 2> "$temp_file"
         
-        # 获取返回状态
-        exit_status=$?
+        # 获取Dialog退出状态和用户选择
+        local status=$?
+        log_debug "Dialog退出状态: $status"
         
-        # 读取选择结果
-        choice=$(cat "$tmp_file")
-        rm -f "$tmp_file"
-        
-        # 记录调试信息
-        echo "菜单选择结果: choice='$choice', 状态=$exit_status" >> "$debug_log"
-        log_debug "菜单选择: $choice, 状态: $exit_status"
-        
-        # 如果按了ESC或取消
-        if [ $exit_status -ne 0 ]; then
-            echo "菜单退出，显示确认对话框 (状态: $exit_status)" >> "$debug_log"
-            dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
-            confirm_status=$?
-            echo "确认对话框状态: $confirm_status" >> "$debug_log"
-            
-            if [ $confirm_status -eq 0 ]; then
-                echo "用户确认退出" >> "$debug_log"
-                break
-            else
-                echo "用户取消退出，返回菜单" >> "$debug_log"
-                continue
-            fi
+        # 如果用户按了取消或ESC，则退出
+        if [ $status -ne 0 ]; then
+            log_debug "用户取消或按ESC键，退出程序"
+            rm -f "$temp_file"
+            clear
+            echo "感谢使用！"
+            exit 0
         fi
         
-        # 处理选择
-        echo "处理用户选择: $choice" >> "$debug_log"
-        
-        case $choice in
-            1) 
-                log_debug "选择了: 系统信息"
-                echo "执行模块: 系统信息" >> "$debug_log"
-                source "$MODULES_DIR/system/system_info.sh"
-                # 暂停以便查看结果
-                dialog --title "操作完成" --msgbox "系统信息查看完成，按确定返回主菜单" 7 40 
-                ;;
-            2) 
-                log_debug "选择了: 系统更新"
-                echo "执行模块: 系统更新" >> "$debug_log"
-                source "$MODULES_DIR/system/system_update.sh"
-                dialog --title "操作完成" --msgbox "系统更新完成，按确定返回主菜单" 7 40 
-                ;;
-            3) 
-                log_debug "选择了: 系统清理"
-                echo "执行模块: 系统清理" >> "$debug_log"
-                source "$MODULES_DIR/system/system_clean.sh"
-                dialog --title "操作完成" --msgbox "系统清理完成，按确定返回主菜单" 7 40 
-                ;;
-            4) 
-                log_debug "选择了: BBR管理"
-                echo "执行模块: BBR管理" >> "$debug_log"
-                source "$MODULES_DIR/network/bbr_manager.sh"
-                dialog --title "操作完成" --msgbox "BBR管理操作完成，按确定返回主菜单" 7 40 
-                ;;
-            5) 
-                log_debug "选择了: Docker管理"
-                echo "执行模块: Docker管理" >> "$debug_log"
-                source "$MODULES_DIR/application/docker_manager.sh"
-                dialog --title "操作完成" --msgbox "Docker管理操作完成，按确定返回主菜单" 7 40 
-                ;;
-            6) 
-                log_debug "选择了: 工作区管理"
-                echo "执行模块: 工作区管理" >> "$debug_log"
-                source "$MODULES_DIR/special/workspace.sh"
-                dialog --title "操作完成" --msgbox "工作区管理操作完成，按确定返回主菜单" 7 40 
-                ;;
-            7) 
-                log_debug "选择了: 检查更新"
-                echo "执行模块: 检查更新" >> "$debug_log"
-                check_updates
-                dialog --title "操作完成" --msgbox "检查更新完成，按确定返回主菜单" 7 40 
-                ;;
-            8) 
-                log_debug "选择了: 卸载系统"
-                echo "执行模块: 卸载系统" >> "$debug_log"
-                uninstall_system
-                dialog --title "操作完成" --msgbox "卸载操作完成，按确定返回主菜单" 7 40 
-                ;;
-            0) 
-                log_debug "选择了: 退出"
-                echo "选择了: 退出系统" >> "$debug_log"
-                dialog --title "确认退出" --yesno "确定要退出 ServerMaster 吗？" 7 40
-                confirm_status=$?
-                echo "确认对话框状态: $confirm_status" >> "$debug_log"
-                
-                if [ $confirm_status -eq 0 ]; then
-                    echo "用户确认退出" >> "$debug_log"
-                    break
-                else
-                    echo "用户取消退出，返回菜单" >> "$debug_log"
+        # 读取用户选择
+        choice=$(<"$temp_file")
+        log_debug "用户选择: $choice"
+        rm -f "$temp_file"
+    fi
+    
+    # 根据用户选择执行对应功能
+    case $choice in
+        1) execute_module "system/system_info.sh" ;;
+        2) execute_module "system/system_update.sh" ;;
+        3) execute_module "system/system_cleanup.sh" ;;
+        4) execute_module "network/bbr_manager.sh" ;;
+        5) execute_module "docker/docker_manager.sh" ;;
+        6) execute_module "file/workspace_manager.sh" ;;
+        7) check_updates ;;
+        8) 
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "退出确认" --yesno "确定要退出吗？" 10 50
+                if [ $? -eq 0 ]; then
+                    clear
+                    echo "感谢使用！"
+                    exit 0
                 fi
-                ;;
-            *) 
-                log_debug "无效选择: $choice"
-                echo "无效选择: '$choice'" >> "$debug_log"
-                dialog --title "错误" --msgbox "无效选择，请重试" 7 40
-                ;;
-        esac
-    done
+            else
+                clear
+                echo "感谢使用！"
+                exit 0
+            fi
+            ;;
+        *)
+            if [ "$USE_TEXT_MODE" = false ]; then
+                dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 10 50
+            else
+                echo "无效选项: $choice"
+                echo "请按Enter键继续..."
+                read
+            fi
+            ;;
+    esac
 }
 
 # 主函数
@@ -617,19 +561,8 @@ main() {
     # 获取窗口尺寸 - 固定大小
     local window_size=(20 70)
     
-    # 欢迎界面
-    if [ "$USE_TEXT_MODE" = false ]; then
-        dialog --title "ServerMaster" \
-               --msgbox "欢迎使用 ServerMaster 服务器管理系统\n\n当前版本: v$VERSION" 12 50
-    else
-        clear
-        echo "====================================================="
-        echo "欢迎使用 ServerMaster 服务器管理系统"
-        echo "当前版本: v$VERSION"
-        echo "====================================================="
-        echo ""
-        read -p "按Enter键继续..." 
-    fi
+    # 显示横幅
+    show_banner
     
     # 检查更新后直接显示主菜单，防止意外跳转
     log_debug "准备执行检查更新..."

@@ -1,188 +1,139 @@
 #!/bin/bash
 
-# System Information Module
-# This module displays system information using Dialog
+# 系统信息模块 - 使用dialog实现更友好的界面
 
-# 定义简单的分隔线字符
-SEP_LINE="----------------------------------------"
+# 定义颜色变量
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+PLAIN='\033[0m'
 
-# Get system information
+# 定义窗口大小
+DIALOG_HEIGHT=20
+DIALOG_WIDTH=70
+
+# 获取系统基本信息
 get_system_info() {
-    # 自定义颜色（使用标准ANSI转义序列）
-    local TITLE="\Z1"    # 红色标题
-    local LABEL="\Z2"    # 绿色标签
-    local VALUE="\Z3"    # 黄色数值
-    local RESET="\Zn"    # 重置颜色
-    
-    # Basic system info
+    clear
+
+    # 收集系统信息
     local hostname=$(hostname)
-    local os_info=$(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)
+    local os_info=$(grep "PRETTY_NAME" /etc/os-release | cut -d '"' -f 2)
     local kernel=$(uname -r)
     local uptime=$(uptime -p)
-    local load_avg=$(cat /proc/loadavg | awk '{print $1, $2, $3}')
-    
-    # CPU info
-    local cpu_model=$(lscpu | grep "Model name" | cut -f 2 -d ":" | sed 's/^[ \t]*//')
+    local load_avg=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+    local cpu_info=$(lscpu | grep "Model name" | sed 's/Model name:\s*//g')
     local cpu_cores=$(nproc)
-    local cpu_freq=$(lscpu | grep "CPU MHz" | cut -f 2 -d ":" | sed 's/^[ \t]*//')
+    local memory_total=$(free -h | awk '/Mem:/ {print $2}')
+    local memory_used=$(free -h | awk '/Mem:/ {print $3}')
+    local memory_used_percent=$(free | awk '/Mem:/ {printf("%.1f", $3/$2*100)}')
+    local disk_info=$(df -h / | awk 'NR==2 {print $2 " 总容量, " $3 " 已用 (" $5 " 使用率)"}')
+    local ip_addr=$(ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d '/' -f 1 | head -n 1)
     
-    # Memory info
-    local total_mem=$(free -h | grep Mem | awk '{print $2}')
-    local used_mem=$(free -h | grep Mem | awk '{print $3}')
-    local free_mem=$(free -h | grep Mem | awk '{print $4}')
-    local swap_total=$(free -h | grep Swap | awk '{print $2}')
-    local swap_used=$(free -h | grep Swap | awk '{print $3}')
+    # 创建信息文本
+    local info_text
+    info_text="系统信息:\n"
+    info_text+="--------------------------------------\n"
+    info_text+="主机名: $hostname\n"
+    info_text+="操作系统: $os_info\n"
+    info_text+="内核版本: $kernel\n"
+    info_text+="运行时间: $uptime\n"
+    info_text+="平均负载: $load_avg\n\n"
     
-    # Disk info
-    local disk_usage=$(df -h / | tail -1 | awk '{print $5}')
-    local disk_total=$(df -h / | tail -1 | awk '{print $2}')
-    local disk_used=$(df -h / | tail -1 | awk '{print $3}')
+    info_text+="硬件信息:\n"
+    info_text+="--------------------------------------\n"
+    info_text+="CPU型号: $cpu_info\n"
+    info_text+="CPU核心数: $cpu_cores\n"
+    info_text+="内存: $memory_used / $memory_total ($memory_used_percent%)\n"
+    info_text+="磁盘: $disk_info\n\n"
     
-    # Network info
-    local ipv4=$(curl -s ifconfig.me)
-    local dns=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}' | tr '\n' ' ')
+    info_text+="网络信息:\n"
+    info_text+="--------------------------------------\n"
+    info_text+="IP地址: $ip_addr\n"
     
-    # 格式化输出，使用简洁的格式
-    local info_text=""
-    info_text+="${TITLE}系统信息概览${RESET}\n"
-    info_text+="$SEP_LINE\n\n"
-    
-    # 系统信息部分
-    info_text+="${LABEL}主机名${RESET}    : ${VALUE}$hostname${RESET}\n"
-    info_text+="${LABEL}操作系统${RESET}  : ${VALUE}$os_info${RESET}\n"
-    info_text+="${LABEL}内核版本${RESET}  : ${VALUE}$kernel${RESET}\n"
-    info_text+="${LABEL}运行时间${RESET}  : ${VALUE}$uptime${RESET}\n"
-    info_text+="${LABEL}系统负载${RESET}  : ${VALUE}$load_avg${RESET}\n\n"
-    
-    info_text+="$SEP_LINE\n"
-    
-    # CPU信息部分
-    info_text+="${TITLE}CPU信息:${RESET}\n"
-    info_text+="${LABEL}CPU型号${RESET}   : ${VALUE}$cpu_model${RESET}\n"
-    info_text+="${LABEL}CPU核心数${RESET} : ${VALUE}$cpu_cores${RESET}\n"
-    info_text+="${LABEL}CPU频率${RESET}   : ${VALUE}$cpu_freq MHz${RESET}\n\n"
-    
-    info_text+="$SEP_LINE\n"
-    
-    # 内存信息部分
-    info_text+="${TITLE}内存信息:${RESET}\n"
-    info_text+="${LABEL}总内存${RESET}    : ${VALUE}$total_mem${RESET}\n"
-    info_text+="${LABEL}已用内存${RESET}  : ${VALUE}$used_mem${RESET}\n"
-    info_text+="${LABEL}空闲内存${RESET}  : ${VALUE}$free_mem${RESET}\n"
-    info_text+="${LABEL}交换空间${RESET}  : ${VALUE}$swap_total (已用: $swap_used)${RESET}\n\n"
-    
-    info_text+="$SEP_LINE\n"
-    
-    # 磁盘信息部分
-    info_text+="${TITLE}磁盘信息:${RESET}\n"
-    info_text+="${LABEL}总空间${RESET}    : ${VALUE}$disk_total${RESET}\n"
-    info_text+="${LABEL}已用空间${RESET}  : ${VALUE}$disk_used${RESET}\n"
-    info_text+="${LABEL}使用率${RESET}    : ${VALUE}$disk_usage${RESET}\n\n"
-    
-    info_text+="$SEP_LINE\n"
-    
-    # 网络信息部分
-    info_text+="${TITLE}网络信息:${RESET}\n"
-    info_text+="${LABEL}公网IPv4${RESET}  : ${VALUE}$ipv4${RESET}\n"
-    info_text+="${LABEL}DNS服务器${RESET} : ${VALUE}$dns${RESET}\n"
-    
-    # Display info using dialog with colors enabled - 使用固定尺寸
-    dialog --title "系统信息" \
-           --colors \
-           --msgbox "$info_text" 28 70
+    # 使用dialog显示信息
+    dialog --title "系统信息" --msgbox "$info_text" $DIALOG_HEIGHT $DIALOG_WIDTH
 }
 
-# 添加交互式菜单 - 使用固定尺寸
-show_menu() {
-    local choice=$(dialog --clear \
-                  --title "系统信息" \
-                  --menu "请选择查看选项:" 15 60 6 \
-                  "1" "系统信息概览" \
-                  "2" "CPU使用情况" \
-                  "3" "内存使用情况" \
-                  "4" "磁盘使用情况" \
-                  "5" "网络连接" \
-                  "6" "返回主菜单" \
-                  3>&1 1>&2 2>&3)
-    
-    case $choice in
-        "1")
-            get_system_info
-            show_menu
-            ;;
-        "2")
-            # 获取CPU使用信息并以图形方式显示
-            local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}' | cut -d. -f1)
-            local cpu_chart=""
-            local i=0
-            while [ $i -lt 50 ]; do
-                if [ $i -lt $(($cpu_usage / 2)) ]; then
-                    cpu_chart="${cpu_chart}#"
-                else
-                    cpu_chart="${cpu_chart}-"
-                fi
-                i=$((i+1))
-            done
-            
-            dialog --title "CPU使用情况" \
-                   --colors \
-                   --msgbox "\n\n\Zb当前CPU使用率:\Zn \Z1$cpu_usage%\Zn\n\n[$cpu_chart]\n\n" 10 60
-            show_menu
-            ;;
-        "3")
-            # 获取内存使用情况并以图形方式显示
-            local mem_info=$(free -m)
-            local total_mem=$(echo "$mem_info" | grep Mem | awk '{print $2}')
-            local used_mem=$(echo "$mem_info" | grep Mem | awk '{print $3}')
-            local usage_percent=$((used_mem * 100 / total_mem))
-            
-            local mem_chart=""
-            local i=0
-            while [ $i -lt 50 ]; do
-                if [ $i -lt $(($usage_percent / 2)) ]; then
-                    mem_chart="${mem_chart}#"
-                else
-                    mem_chart="${mem_chart}-"
-                fi
-                i=$((i+1))
-            done
-            
-            dialog --title "内存使用情况" \
-                   --colors \
-                   --msgbox "\n\n\Zb内存使用:\Zn \Z1$used_mem MB\Zn / \Z2$total_mem MB\Zn (\Z3$usage_percent%\Zn)\n\n[$mem_chart]\n\n" 10 60
-            show_menu
-            ;;
-        "4")
-            # 显示磁盘使用情况
-            local disk_info=$(df -h | grep -v "tmpfs\|udev")
-            dialog --title "磁盘使用情况" \
-                   --colors \
-                   --msgbox "$disk_info" 18 70
-            show_menu
-            ;;
-        "5")
-            # 显示网络连接
-            local connections=$(netstat -tulpn 2>/dev/null | grep LISTEN | head -10)
-            # 如果netstat命令不可用，尝试ss命令
-            if [ -z "$connections" ]; then
-                connections=$(ss -tulpn | grep LISTEN | head -10)
-            fi
-            dialog --title "网络连接" \
-                   --colors \
-                   --msgbox "当前监听的网络连接:\n\n$connections" 18 70
-            show_menu
-            ;;
-        "6"|"")
-            return 0
-            ;;
-    esac
+# 获取CPU详细信息
+get_cpu_info() {
+    local cpu_info=$(lscpu)
+    dialog --title "CPU详细信息" --msgbox "$cpu_info" $DIALOG_HEIGHT $DIALOG_WIDTH
 }
 
-# Main function
+# 获取内存详细信息
+get_memory_info() {
+    local memory_info=$(free -h)
+    dialog --title "内存详细信息" --msgbox "$memory_info" $DIALOG_HEIGHT $DIALOG_WIDTH
+}
+
+# 获取磁盘详细信息
+get_disk_info() {
+    local disk_info=$(df -h)
+    dialog --title "磁盘使用情况" --msgbox "$disk_info" $DIALOG_HEIGHT $DIALOG_WIDTH
+}
+
+# 获取网络连接信息
+get_network_info() {
+    local netstat_info=$(netstat -tuln)
+    dialog --title "网络连接信息" --msgbox "$netstat_info" $DIALOG_HEIGHT $DIALOG_WIDTH
+}
+
+# 显示系统信息菜单
+show_system_menu() {
+    while true; do
+        # 创建临时文件存储选择结果
+        local temp_file=$(mktemp)
+        
+        # 显示菜单
+        dialog --clear --title "系统信息" \
+               --menu "请选择要查看的信息:" $DIALOG_HEIGHT $DIALOG_WIDTH 7 \
+               "1" "系统概览" \
+               "2" "CPU详细信息" \
+               "3" "内存详细信息" \
+               "4" "磁盘使用情况" \
+               "5" "网络连接信息" \
+               "0" "返回主菜单" 2> "$temp_file"
+        
+        # 获取退出状态和选择结果
+        local status=$?
+        local choice=$(<"$temp_file")
+        rm -f "$temp_file"
+        
+        # 如果用户按了取消或ESC，则返回主菜单
+        if [ $status -ne 0 ]; then
+            break
+        fi
+        
+        # 处理用户选择
+        case $choice in
+            1) get_system_info ;;
+            2) get_cpu_info ;;
+            3) get_memory_info ;;
+            4) get_disk_info ;;
+            5) get_network_info ;;
+            0) break ;;
+            *) dialog --title "错误" --msgbox "无效选项，请重新选择" 10 30 ;;
+        esac
+    done
+}
+
+# 主函数
 main() {
-    # 显示主菜单而不是直接显示系统信息
-    show_menu
+    # 如果没有安装dialog，提示错误并退出
+    if ! command -v dialog &> /dev/null; then
+        echo "错误: 请先安装dialog"
+        echo "Debian/Ubuntu: sudo apt install dialog"
+        echo "CentOS/RHEL: sudo yum install dialog"
+        exit 1
+    fi
+    
+    # 显示系统信息菜单
+    show_system_menu
 }
 
-# Start the module
+# 执行主函数
 main
