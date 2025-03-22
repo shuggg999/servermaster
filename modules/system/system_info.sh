@@ -12,8 +12,8 @@ CYAN='\033[0;36m'
 PLAIN='\033[0m'
 
 # 定义窗口大小
-DIALOG_HEIGHT=20
-DIALOG_WIDTH=70
+DIALOG_HEIGHT=40
+DIALOG_WIDTH=140
 
 # 获取系统基本信息
 get_system_info() {
