@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# system_management模块菜单
-# 此脚本提供系统管理相关功能的菜单界面
+# 系统更新
+# 此脚本提供系统及软件包更新功能
 
 # 只在变量未定义时才设置安装目录
 if [ -z "$INSTALL_DIR" ]; then
@@ -19,18 +19,15 @@ fi
 # 保存当前目录
 CURRENT_DIR="$(pwd)"
 
-# 显示菜单
-show_system_management_menu() {
-    local title="系统管理"
+# 显示系统更新菜单
+show_system_update_menu() {
+    local title="系统更新"
     local menu_items=(
-        "1" "系统信息查询 - 显示系统基本信息"
-        "2" "系统更新 - 更新系统及软件包"
-        "3" "系统清理 - 清理系统垃圾文件"
-        "4" "系统工具 - 环境配置与资源管理"
-        "5" "用户管理 - 用户添加/删除/权限管理"
-        "6" "性能优化 - 系统性能调优工具"
-        "7" "用户体验 - 命令行美化与工具"
-        "0" "返回主菜单"
+        "1" "系统全面更新 - 更新所有软件包"
+        "2" "指定软件包更新 - 更新指定软件"
+        "3" "软件源管理 - 配置软件源"
+        "4" "仅更新安全补丁 - 仅应用安全更新"
+        "0" "返回上级菜单"
     )
     
     while true; do
@@ -40,24 +37,24 @@ show_system_management_menu() {
         if [ "$USE_TEXT_MODE" = true ]; then
             clear
             echo "====================================================="
-            echo "      系统管理菜单                                    "
+            echo "      系统更新                                        "
             echo "====================================================="
             echo ""
-            echo "  1) 系统信息查询          5) 用户管理"
-            echo "  2) 系统更新              6) 性能优化"
-            echo "  3) 系统清理              7) 用户体验"
-            echo "  4) 系统工具              "
+            echo "  1) 系统全面更新"
+            echo "  2) 指定软件包更新"
+            echo "  3) 软件源管理"
+            echo "  4) 仅更新安全补丁"
             echo ""
-            echo "  0) 返回主菜单"
+            echo "  0) 返回上级菜单"
             echo ""
-            read -p "请选择操作 [0-7]: " choice
+            read -p "请选择操作 [0-4]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
-            # 使用Dialog显示菜单，应用标准尺寸
+            # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 8 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 5 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -68,14 +65,16 @@ show_system_management_menu() {
             fi
         fi
         
+        # 这里只是占位，具体功能实现会在后续开发中添加
         case $choice in
-            1) execute_module "system_management/system_info.sh" ;;
-            2) execute_module "system_management/system_update.sh" ;;
-            3) execute_module "system_management/system_clean.sh" ;;
-            4) execute_module "system_management/system_tools.sh" ;;
-            5) execute_module "system_management/user_management.sh" ;;
-            6) execute_module "system_management/performance_optimization.sh" ;;
-            7) execute_module "system_management/user_experience.sh" ;;
+            1|2|3|4) 
+                if [ "$USE_TEXT_MODE" = true ]; then
+                    echo "该功能尚未实现"
+                    sleep 2
+                else
+                    dialog --title "提示" --msgbox "该功能尚未实现" 8 40
+                fi
+                ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
@@ -100,7 +99,7 @@ show_system_management_menu() {
 }
 
 # 运行菜单
-show_system_management_menu
+show_system_update_menu
 
 # 确保在脚本结束时恢复原始目录
 cd "$CURRENT_DIR" 
