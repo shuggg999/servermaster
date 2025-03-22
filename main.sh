@@ -459,13 +459,18 @@ execute_module() {
     # 保存当前工作目录
     local current_dir=$(pwd)
     
-    log_debug "尝试执行模块: $full_path"
+    log_debug "尝试执行模块: $full_path (当前目录: $current_dir)"
     
     if [ -f "$full_path" ]; then
         log_debug "模块存在，执行中..."
         # 切换到安装目录再执行，确保相对路径正确
         cd "$INSTALL_DIR"
+        # 使用绝对路径执行模块
         source "$full_path"
+        
+        # 立即恢复原来的工作目录
+        cd "$current_dir"
+        log_debug "模块执行完成，已恢复工作目录: $(pwd)"
         
         if [ "$USE_TEXT_MODE" = true ]; then
     echo ""
@@ -473,7 +478,7 @@ execute_module() {
             read
         fi
     else
-        log_error "模块不存在: $full_path"
+        log_error "模块不存在: $full_path (当前目录: $current_dir)"
         
         if [ "$USE_TEXT_MODE" = true ]; then
             echo "错误: 模块不存在 ($module_path)"
@@ -489,10 +494,10 @@ execute_module() {
             
             dialog --title "错误" --msgbox "模块不存在: $module_path\n请检查安装是否完整" $error_height $error_width
         fi
+        
+        # 确保在错误情况下也恢复工作目录
+        cd "$current_dir"
     fi
-    
-    # 恢复原来的工作目录
-    cd "$current_dir"
 }
 
 # 文本模式的菜单
