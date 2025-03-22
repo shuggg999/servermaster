@@ -431,7 +431,7 @@ uninstall_system() {
                 echo "ServerMaster 已成功卸载！"
             fi
             clear
-            exit 0
+            exit 0 
         fi
     fi
     
@@ -452,7 +452,7 @@ execute_module() {
         source "$full_path"
         
         if [ "$USE_TEXT_MODE" = true ]; then
-            echo ""
+    echo ""
             echo "模块执行完成，按Enter键返回主菜单..."
             read
         fi
@@ -462,7 +462,7 @@ execute_module() {
         if [ "$USE_TEXT_MODE" = true ]; then
             echo "错误: 模块不存在 ($module_path)"
             echo "请检查安装是否完整"
-            echo ""
+    echo ""
             echo "按Enter键继续..."
             read
         else
@@ -485,26 +485,25 @@ show_text_menu() {
         echo "====================================================="
         echo "      ServerMaster 主菜单 (v$VERSION)                "
         echo "====================================================="
-        echo ""
-        echo "  系统管理:                  网络与应用:"
-        echo "  1) 系统信息                5) Docker管理"
-        echo "  2) 系统更新                6) 工作区管理"
-        echo "  3) 系统清理                7) 检查更新"
-        echo "  4) BBR管理                 8) 卸载系统"
-        echo ""
-        echo "  0) 退出"
-        echo ""
-        read -p "请选择操作 [0-8]: " choice
+    echo ""
+        echo "  1) 系统管理              6) 集群管理"
+        echo "  2) 网络与安全            7) 工作区管理"
+        echo "  3) 备份与同步            8) 内网穿透"
+        echo "  4) 容器与应用部署        9) 系统维护"
+        echo "  5) 测试与诊断            0) 退出系统"
+    echo ""
+        read -p "请选择操作 [0-9]: " choice
         
         case $choice in
-            1) execute_module "system/system_info.sh" ;;
-            2) execute_module "system/system_update.sh" ;;
-            3) execute_module "system/system_clean.sh" ;;
-            4) execute_module "network/bbr_manager.sh" ;;
-            5) execute_module "application/docker_manager.sh" ;;
-            6) execute_module "special/workspace.sh" ;;
-            7) check_updates ;;
-            8) uninstall_system ;;
+            1) execute_module "system_management/system_menu.sh" ;;
+            2) execute_module "network_security/network_menu.sh" ;;
+            3) execute_module "backup_sync/backup_menu.sh" ;;
+            4) execute_module "container_deploy/container_menu.sh" ;;
+            5) execute_module "test_diagnostic/test_menu.sh" ;;
+            6) execute_module "cluster_management/cluster_menu.sh" ;;
+            7) execute_module "workspace_management/workspace_menu.sh" ;;
+            8) execute_module "intranet_penetration/intranet_menu.sh" ;;
+            9) execute_module "system_maintenance/maintenance_menu.sh" ;;
             0)
                 echo "确定要退出 ServerMaster 吗？"
                 read -p "确认退出？(y/n) " -n 1 -r
@@ -515,9 +514,9 @@ show_text_menu() {
                 ;;
             *)
                 echo "无效选择，请重试"
-                sleep 1
-                ;;
-        esac
+            sleep 1
+            ;;
+    esac
     done
     
     clear
@@ -544,7 +543,7 @@ show_banner() {
         echo -e "${BLUE}              版本: $VERSION                     ${NC}"
         echo -e "${YELLOW}      一个简单而强大的服务器管理工具            ${NC}"
         echo -e "${GREEN}================================================${NC}"
-        echo ""
+    echo ""
     fi
 }
 
@@ -555,18 +554,8 @@ show_main_menu() {
     while true; do
         if [ "$USE_TEXT_MODE" = true ]; then
             # 文本模式菜单
-            echo "-- 主菜单 --"
-            echo "1. 系统信息 - 显示系统基本信息"
-            echo "2. 系统更新 - 更新系统及软件包"
-            echo "3. 系统清理 - 清理系统垃圾文件"
-            echo "4. BBR管理 - 安装/配置Google BBR"
-            echo "5. Docker管理 - 安装/管理Docker应用"
-            echo "6. 工作区管理 - 文件/目录操作" 
-            echo "7. 脚本更新 - 检查更新ServerMaster"
-            echo "8. 退出 - 退出脚本"
-            echo ""
-            echo -n "请输入选项 [1-8]: "
-            read choice
+            show_text_menu
+            return
         else
             # 获取窗口大小
             read dialog_height dialog_width <<< $(get_dialog_size)
@@ -578,15 +567,17 @@ show_main_menu() {
             
             # 创建Dialog菜单
             dialog --clear --title "主菜单" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 8 \
-                "1" "系统信息 - 显示系统基本信息" \
-                "2" "系统更新 - 更新系统及软件包" \
-                "3" "系统清理 - 清理系统垃圾文件" \
-                "4" "BBR管理 - 安装/配置Google BBR" \
-                "5" "Docker管理 - 安装/管理Docker应用" \
-                "6" "工作区管理 - 文件/目录操作" \
-                "7" "脚本更新 - 检查更新ServerMaster" \
-                "8" "退出 - 退出脚本" 2> "$temp_file"
+                --menu "请选择一个选项:" $dialog_height $dialog_width 9 \
+                "1" "系统管理 - 系统信息、更新、清理和工具" \
+                "2" "网络与安全 - 防火墙、BBR、VPN及安全工具" \
+                "3" "备份与同步 - 系统备份、定时任务和远程同步" \
+                "4" "容器与应用部署 - Docker管理和应用部署" \
+                "5" "测试与诊断 - 网络测速、性能测试和解锁检测" \
+                "6" "集群管理 - 多服务器批量操作" \
+                "7" "工作区管理 - 工作区创建和管理" \
+                "8" "内网穿透 - FRP服务端和客户端管理" \
+                "9" "系统维护 - 脚本更新和系统卸载" \
+                "0" "退出 - 退出系统" 2> "$temp_file"
             
             # 获取Dialog退出状态和用户选择
             local status=$?
@@ -609,14 +600,16 @@ show_main_menu() {
         
         # 根据用户选择执行对应功能
         case $choice in
-            1) execute_module "system/system_info.sh" ;;
-            2) execute_module "system/system_update.sh" ;;
-            3) execute_module "system/system_clean.sh" ;;
-            4) execute_module "network/bbr_manager.sh" ;;
-            5) execute_module "docker/docker_manager.sh" ;;
-            6) execute_module "file/workspace_manager.sh" ;;
-            7) check_updates ;;
-            8) 
+            1) execute_module "system_management/system_menu.sh" ;;
+            2) execute_module "network_security/network_menu.sh" ;;
+            3) execute_module "backup_sync/backup_menu.sh" ;;
+            4) execute_module "container_deploy/container_menu.sh" ;;
+            5) execute_module "test_diagnostic/test_menu.sh" ;;
+            6) execute_module "cluster_management/cluster_menu.sh" ;;
+            7) execute_module "workspace_management/workspace_menu.sh" ;;
+            8) execute_module "intranet_penetration/intranet_menu.sh" ;;
+            9) execute_module "system_maintenance/maintenance_menu.sh" ;;
+            0) 
                 if [ "$USE_TEXT_MODE" = false ]; then
                     # 获取窗口大小
                     read exit_height exit_width <<< $(get_dialog_size)
@@ -648,8 +641,8 @@ show_main_menu() {
                     echo "请按Enter键继续..."
                     read
                 fi
-                ;;
-        esac
+            ;;
+    esac
     done
 }
 

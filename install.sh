@@ -10,6 +10,19 @@ CONFIG_DIR="$INSTALL_DIR/config"
 LOGS_DIR="$INSTALL_DIR/logs"
 TEMP_DIR="/tmp/servermaster"
 
+# 模块子目录
+MODULE_SUBDIRS=(
+    "system_management"
+    "network_security"
+    "backup_sync"
+    "container_deploy"
+    "test_diagnostic"
+    "cluster_management"
+    "workspace_management"
+    "intranet_penetration"
+    "system_maintenance"
+)
+
 # URLs
 GITHUB_REPO="https://github.com/shuggg999/servermaster"
 GITHUB_RAW="https://raw.githubusercontent.com/shuggg999/servermaster/main"
@@ -168,7 +181,7 @@ create_directories() {
                    "无法创建安装目录: $INSTALL_DIR"
     fi
     
-    # 创建子目录
+    # 创建基本子目录
     local subdirs=("$MODULES_DIR" "$CONFIG_DIR" "$LOGS_DIR" "$TEMP_DIR")
     for dir in "${subdirs[@]}"; do
         if [ -d "$dir" ]; then
@@ -177,6 +190,18 @@ create_directories() {
             execute_cmd "mkdir -p $dir" \
                        "创建目录: $dir" \
                        "无法创建目录: $dir"
+        fi
+    done
+    
+    # 创建模块子目录
+    for subdir in "${MODULE_SUBDIRS[@]}"; do
+        local module_dir="$MODULES_DIR/$subdir"
+        if [ -d "$module_dir" ]; then
+            log "INFO" "模块目录已存在: $module_dir"
+        else
+            execute_cmd "mkdir -p $module_dir" \
+                       "创建模块目录: $module_dir" \
+                       "无法创建模块目录: $module_dir"
         fi
     done
     
@@ -289,6 +314,105 @@ download_main_script() {
     fi
 }
 
+# 创建初始模块文件
+create_initial_modules() {
+    log "INFO" "创建初始模块文件"
+    
+    # 创建主菜单模块
+    for module in "${MODULE_SUBDIRS[@]}"; do
+        local menu_file="$MODULES_DIR/$module/${module}_menu.sh"
+        
+        # 跳过已存在的文件
+        if [ -f "$menu_file" ]; then
+            log "INFO" "菜单文件已存在: $menu_file"
+            continue
+        fi
+        
+        # 创建菜单文件
+        cat > "$menu_file" << EOF
+#!/bin/bash
+
+# $module 模块菜单
+# 此脚本提供 $module 相关功能的菜单界面
+
+# 获取安装目录
+INSTALL_DIR="\$(dirname \$(dirname \$(dirname \$(readlink -f \$0))))"
+MODULES_DIR="\$INSTALL_DIR/modules"
+
+# 导入共享函数
+source "\$INSTALL_DIR/main.sh"
+
+# 显示菜单
+show_${module}_menu() {
+    local title="$module 管理"
+    local menu_items=(
+        "1" "功能1 - 描述"
+        "2" "功能2 - 描述"
+        "3" "功能3 - 描述"
+        "0" "返回上级菜单"
+    )
+    
+    while true; do
+        if [ "\$USE_TEXT_MODE" = true ]; then
+            clear
+            echo "====================================================="
+            echo "      \$title 菜单                                    "
+            echo "====================================================="
+            echo ""
+            echo "  1) 功能1                      "
+            echo "  2) 功能2                      "
+            echo "  3) 功能3                      "
+            echo ""
+            echo "  0) 返回上级菜单"
+            echo ""
+            read -p "请选择操作 [0-3]: " choice
+        else
+            # 使用Dialog显示菜单
+            choice=\$(dialog --clear --title "\$title" \\
+                --menu "请选择一个选项:" 15 60 4 \\
+                "\${menu_items[@]}" 2>&1 >/dev/tty)
+            
+            # 检查是否按下ESC或Cancel
+            if [ \$? -ne 0 ]; then
+                return
+            fi
+        fi
+        
+        case \$choice in
+            1) echo "功能1未实现" ;;
+            2) echo "功能2未实现" ;;
+            3) echo "功能3未实现" ;;
+            0) return ;;
+            *) 
+                if [ "\$USE_TEXT_MODE" = true ]; then
+                    echo "无效选择，请重试"
+                    sleep 1
+                else
+                    dialog --title "错误" --msgbox "无效选项: \$choice\\n请重新选择" 8 40
+                fi
+                ;;
+        esac
+        
+        # 文本模式下，显示按键提示
+        if [ "\$USE_TEXT_MODE" = true ]; then
+            echo ""
+            echo "按Enter键继续..."
+            read
+        fi
+    done
+}
+
+# 运行菜单
+show_${module}_menu
+EOF
+        # 设置可执行权限
+        chmod +x "$menu_file"
+        log "SUCCESS" "创建菜单文件: $menu_file"
+    done
+    
+    log "SUCCESS" "初始模块文件创建完成"
+}
+
 # 下载模块
 download_modules() {
     log "INFO" "开始下载系统模块"
@@ -361,9 +485,9 @@ download_modules() {
     rm -f "$TEMP_DIR/modules.tar.gz.tmp" "$TEMP_DIR/modules.tar.gz"
     
     if [ "$download_success" = false ]; then
-        log "ERROR" "所有下载源均无法下载系统模块，已达最大重试次数: $output"
-        exit 1
-    fi
+        log "INFO" "下载远程模块失败，创建本地初始模块"
+        create_initial_modules
+    }
 }
 
 # 创建命令链接
@@ -464,7 +588,7 @@ main() {
     log "INFO" "2. 创建必要目录"
     log "INFO" "3. 检查网络连接"
     log "INFO" "4. 下载主脚本"
-    log "INFO" "5. 下载系统模块"
+    log "INFO" "5. 创建模块结构"
     log "INFO" "6. 创建系统命令"
     log "INFO" "7. 完成安装"
     echo ""
@@ -474,7 +598,12 @@ main() {
     create_directories
     check_connectivity
     download_main_script
-    download_modules
+    
+    # 如果下载模块失败，则创建本地初始模块
+    if ! download_modules; then
+        create_initial_modules
+    fi
+    
     create_command
     
     # 完成安装
