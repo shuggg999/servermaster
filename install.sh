@@ -487,7 +487,7 @@ download_modules() {
     if [ "$download_success" = false ]; then
         log "INFO" "下载远程模块失败，创建本地初始模块"
         create_initial_modules
-    }
+    fi
 }
 
 # 创建命令链接
