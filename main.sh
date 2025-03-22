@@ -10,6 +10,11 @@ DEBUG=true
 # 文本模式标志，当Dialog不可用时使用
 USE_TEXT_MODE=false
 
+# 系统名称和版本信息
+SYSTEM_NAME="ServerMaster"
+# 获取版本号
+VERSION="1.0"
+
 # 日志函数
 log_debug() {
     if [ "$DEBUG" = true ]; then
@@ -361,6 +366,37 @@ uninstall_system() {
     return
 }
 
+# 执行模块的函数
+execute_module() {
+    local module_path="$1"
+    local full_path="$MODULES_DIR/$module_path"
+    
+    log_debug "尝试执行模块: $full_path"
+    
+    if [ -f "$full_path" ]; then
+        log_debug "模块存在，执行中..."
+        source "$full_path"
+        
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo ""
+            echo "模块执行完成，按Enter键返回主菜单..."
+            read
+        fi
+    else
+        log_error "模块不存在: $full_path"
+        
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 模块不存在 ($module_path)"
+            echo "请检查安装是否完整"
+            echo ""
+            echo "按Enter键继续..."
+            read
+        else
+            dialog --title "错误" --msgbox "模块不存在: $module_path\n请检查安装是否完整" 10 50
+        fi
+    fi
+}
+
 # 文本模式的菜单
 show_text_menu() {
     log_debug "显示文本模式菜单"
@@ -382,38 +418,14 @@ show_text_menu() {
         read -p "请选择操作 [0-8]: " choice
         
         case $choice in
-            1) 
-                source "$MODULES_DIR/system/system_info.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            2) 
-                source "$MODULES_DIR/system/system_update.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            3) 
-                source "$MODULES_DIR/system/system_clean.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            4) 
-                source "$MODULES_DIR/network/bbr_manager.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            5) 
-                source "$MODULES_DIR/application/docker_manager.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            6) 
-                source "$MODULES_DIR/special/workspace.sh"
-                read -p "按Enter键继续..." 
-                ;;
-            7) 
-                check_updates
-                read -p "按Enter键继续..." 
-                ;;
-            8) 
-                uninstall_system
-                read -p "按Enter键继续..." 
-                ;;
+            1) execute_module "system/system_info.sh" ;;
+            2) execute_module "system/system_update.sh" ;;
+            3) execute_module "system/system_clean.sh" ;;
+            4) execute_module "network/bbr_manager.sh" ;;
+            5) execute_module "application/docker_manager.sh" ;;
+            6) execute_module "special/workspace.sh" ;;
+            7) check_updates ;;
+            8) uninstall_system ;;
             0)
                 echo "确定要退出 ServerMaster 吗？"
                 read -p "确认退出？(y/n) " -n 1 -r
@@ -436,20 +448,21 @@ show_text_menu() {
 
 # 显示横幅
 show_banner() {
-    local width=70
-    local center_padding=$(( (width - ${#SYSTEM_NAME}) / 2 ))
-    local version_padding=$(( (width - ${#VERSION} - 9) / 2 ))
+    local system_name="$1"
+    log_debug "显示横幅，系统名称: $system_name"
     
-    if [ "$USE_TEXT_MODE" = true ]; then
-        echo ""
-        echo $(printf "%${width}s" | tr " " "-")
-        echo "$(printf "%${center_padding}s")$SYSTEM_NAME"
-        echo "$(printf "%${version_padding}s")版本: $VERSION"
-        echo $(printf "%${width}s" | tr " " "-")
-        echo ""
+    if [ "$USE_TEXT_MODE" = false ]; then
+        # 使用Dialog显示横幅
+        dialog --title "欢迎" --msgbox "\n    欢迎使用 $system_name 系统\n    版本: $VERSION\n\n    一个简单而强大的服务器管理工具\n" 10 50
     else
-        local message="$SYSTEM_NAME\n\n版本: $VERSION"
-        dialog --title "欢迎使用" --msgbox "$message" 10 50
+        # 文本模式横幅
+        clear
+        echo -e "${GREEN}================================================${NC}"
+        echo -e "${YELLOW}           欢迎使用 $system_name 系统           ${NC}"
+        echo -e "${BLUE}              版本: $VERSION                     ${NC}"
+        echo -e "${YELLOW}      一个简单而强大的服务器管理工具            ${NC}"
+        echo -e "${GREEN}================================================${NC}"
+        echo ""
     fi
 }
 
@@ -517,7 +530,7 @@ show_main_menu() {
     case $choice in
         1) execute_module "system/system_info.sh" ;;
         2) execute_module "system/system_update.sh" ;;
-        3) execute_module "system/system_cleanup.sh" ;;
+        3) execute_module "system/system_clean.sh" ;;
         4) execute_module "network/bbr_manager.sh" ;;
         5) execute_module "docker/docker_manager.sh" ;;
         6) execute_module "file/workspace_manager.sh" ;;
@@ -558,11 +571,17 @@ main() {
     # 检查模块
     check_modules
     
+    # 获取版本号 - 从文件读取并覆盖默认值
+    if [ -f "$INSTALL_DIR/version.txt" ]; then
+        VERSION=$(cat "$INSTALL_DIR/version.txt")
+        log_debug "从文件读取版本号: $VERSION"
+    fi
+    
     # 获取窗口尺寸 - 固定大小
     local window_size=(20 70)
     
     # 显示横幅
-    show_banner
+    show_banner "$SYSTEM_NAME"
     
     # 检查更新后直接显示主菜单，防止意外跳转
     log_debug "准备执行检查更新..."
