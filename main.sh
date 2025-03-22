@@ -66,7 +66,7 @@ else
     if [ ! -f "$CONFIG_DIR/dialog_rules.sh" ]; then
         log_debug "对话框规则文件不存在: $CONFIG_DIR/dialog_rules.sh，将使用基本对话框"
     fi
-}
+fi
 
 # 检查脚本运行环境并记录信息
 check_environment() {
