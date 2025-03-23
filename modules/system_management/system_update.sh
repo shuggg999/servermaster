@@ -27,59 +27,88 @@ RED="\033[1;31m"
 RESET="\033[0m"
 SEPARATOR="------------------------------------------------------"
 
+# 创建日志目录
+mkdir -p "$INSTALL_DIR/logs"
+# 固定日志文件位置
+DETAILED_LOG="$INSTALL_DIR/logs/system_update.log"
+# 清空之前的日志
+echo "系统更新日志 - $(date '+%Y-%m-%d %H:%M:%S')" > "$DETAILED_LOG"
+echo "$SEPARATOR" >> "$DETAILED_LOG"
+
+# 日志函数
+log_message() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $message" | tee -a "$DETAILED_LOG"
+}
+
 # 智能执行命令函数（替代sudo）
 safe_exec() {
     # 如果用户是root，直接执行命令
     if [ "$(id -u)" -eq 0 ]; then
-        eval "$@"
+        log_message "以root身份执行: $*"
+        eval "$@" 2>&1 | tee -a "$DETAILED_LOG"
+        return ${PIPESTATUS[0]}
     # 如果系统有sudo命令，使用sudo执行
     elif command -v sudo &> /dev/null; then
-        sudo "$@"
+        log_message "以sudo执行: $*"
+        sudo "$@" 2>&1 | tee -a "$DETAILED_LOG"
+        return ${PIPESTATUS[0]}
     # 如果都不满足，提示错误
     else
-        echo -e "${RED}错误: 需要root权限执行该命令，但系统中没有sudo命令${RESET}"
-        echo -e "${YELLOW}请使用root用户执行此脚本，或安装sudo软件包${RESET}"
+        log_message "${RED}错误: 需要root权限执行该命令，但系统中没有sudo命令${RESET}"
+        echo -e "${RED}错误: 需要root权限执行该命令，但系统中没有sudo命令${RESET}" | tee -a "$DETAILED_LOG"
+        echo -e "${YELLOW}请使用root用户执行此脚本，或安装sudo软件包${RESET}" | tee -a "$DETAILED_LOG"
         return 1
     fi
 }
 
 # 修复 dpkg 可能的中断问题（更安全）
 fix_dpkg_safe() {
+    log_message "检查并修复 dpkg 相关问题..."
     echo -e "检查并修复 dpkg 相关问题..."
 
     # 查找是否有 apt/dpkg 进程占用锁文件
     if safe_exec lsof /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock &>/dev/null; then
+        log_message "检测到 dpkg 被占用，尝试优雅终止相关进程..."
         echo -e "检测到 dpkg 被占用，尝试优雅终止相关进程..."
         
         # 获取占用进程的 PID
         PIDS=$(safe_exec lsof -t /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock)
         for PID in $PIDS; do
+            log_message "终止进程: $PID"
             echo -e "终止进程: $PID"
             safe_exec kill -TERM $PID  # 先尝试优雅终止
             sleep 2  # 等待进程退出
             if ps -p $PID &>/dev/null; then
+                log_message "进程 $PID 未能终止，执行强制终止..."
                 echo -e "进程 $PID 未能终止，执行强制终止..."
                 safe_exec kill -9 $PID  # 若进程仍未退出，则强制终止
             fi
         done
     else
+        log_message "未检测到 dpkg 进程占用锁文件。"
         echo -e "未检测到 dpkg 进程占用锁文件。"
     fi
 
     # 停止系统自动更新服务（适用于 Ubuntu/Debian）
+    log_message "停止 apt 相关的自动更新服务..."
     echo -e "停止 apt 相关的自动更新服务..."
     safe_exec systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null
     safe_exec systemctl disable apt-daily.service apt-daily-upgrade.service 2>/dev/null
 
     # 确保锁文件被删除
+    log_message "删除 dpkg 锁文件..."
     echo -e "删除 dpkg 锁文件..."
     safe_exec rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
 
     # 修复 dpkg 未完成的安装
+    log_message "修复 dpkg 配置..."
     echo -e "修复 dpkg 配置..."
     safe_exec dpkg --configure -a
 
     # 再次启用自动更新服务
+    log_message "重新启用 apt 自动更新服务..."
     echo -e "重新启用 apt 自动更新服务..."
     safe_exec systemctl enable apt-daily.service apt-daily-upgrade.service 2>/dev/null
 }
@@ -90,54 +119,139 @@ system_update() {
     local status_file=$(mktemp)
     echo "成功" > "$status_file"
     
+    log_message "开始进行系统更新..."
     echo -e "开始进行系统更新..."
 
+    # 检测系统类型
+    local os_type=""
+    local os_version=""
+    
+    if [ -f /etc/os-release ]; then
+        os_type=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+        os_version=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
+        log_message "检测到操作系统: $os_type $os_version"
+    else
+        log_message "警告: 无法检测操作系统类型"
+    fi
+
     if command -v dnf &>/dev/null; then
+        log_message "检测到 DNF，使用 DNF 进行更新..."
         echo -e "检测到 DNF，使用 DNF 进行更新..."
+        # 先更新源
+        log_message "更新 DNF 仓库信息..."
+        if ! safe_exec dnf check-update -y; then
+            log_message "DNF 仓库更新遇到问题，但继续尝试更新软件包..."
+        fi
+        # 执行更新
+        log_message "更新软件包..."
         if ! safe_exec dnf -y update; then
+            log_message "DNF 更新失败"
             echo "失败" > "$status_file"
+        else
+            log_message "DNF 更新成功"
         fi
 
     elif command -v yum &>/dev/null; then
+        log_message "检测到 YUM，使用 YUM 进行更新..."
         echo -e "检测到 YUM，使用 YUM 进行更新..."
+        # 先更新源
+        log_message "更新 YUM 仓库信息..."
+        if ! safe_exec yum check-update -y; then
+            log_message "YUM 仓库更新遇到问题，但继续尝试更新软件包..."
+        fi
+        # 执行更新
+        log_message "更新软件包..."
         if ! safe_exec yum -y update; then
+            log_message "YUM 更新失败"
             echo "失败" > "$status_file"
+        else
+            log_message "YUM 更新成功"
         fi
 
     elif command -v apt &>/dev/null; then
+        log_message "检测到 APT，使用 APT 进行更新..."
         echo -e "检测到 APT，使用 APT 进行更新..."
-        fix_dpkg_safe  # 修复 dpkg 可能的中断问题
-        safe_exec DEBIAN_FRONTEND=noninteractive apt update -y
+        # 修复 dpkg 问题
+        fix_dpkg_safe
+        # 更新源
+        log_message "更新 APT 仓库信息..."
+        if ! safe_exec DEBIAN_FRONTEND=noninteractive apt update -y; then
+            log_message "APT 仓库更新失败"
+        else
+            log_message "APT 仓库更新成功"
+        fi
+        # 执行更新
+        log_message "更新软件包..."
         if ! safe_exec DEBIAN_FRONTEND=noninteractive apt full-upgrade -y; then
+            log_message "APT 更新失败"
             echo "失败" > "$status_file"
+        else
+            log_message "APT 更新成功"
         fi
 
     elif command -v apk &>/dev/null; then
+        log_message "检测到 APK，使用 Alpine 的 apk 进行更新..."
         echo -e "检测到 APK，使用 Alpine 的 apk 进行更新..."
-        if ! (safe_exec apk update && safe_exec apk upgrade); then
-            echo "失败" > "$status_file"
+        log_message "更新 APK 仓库信息..."
+        if ! safe_exec apk update; then
+            log_message "APK 仓库更新失败"
+        else
+            log_message "APK 仓库更新成功"
+            log_message "更新软件包..."
+            if ! safe_exec apk upgrade; then
+                log_message "APK 更新失败"
+                echo "失败" > "$status_file"
+            else
+                log_message "APK 更新成功"
+            fi
         fi
 
     elif command -v pacman &>/dev/null; then
+        log_message "检测到 Pacman，使用 Arch Linux 的 pacman 进行更新..."
         echo -e "检测到 Pacman，使用 Arch Linux 的 pacman 进行更新..."
         if ! safe_exec pacman -Syu --noconfirm; then
+            log_message "Pacman 更新失败"
             echo "失败" > "$status_file"
+        else
+            log_message "Pacman 更新成功"
         fi
 
     elif command -v zypper &>/dev/null; then
+        log_message "检测到 Zypper，使用 OpenSUSE 的 zypper 进行更新..."
         echo -e "检测到 Zypper，使用 OpenSUSE 的 zypper 进行更新..."
-        safe_exec zypper refresh
-        if ! safe_exec zypper update -y; then
-            echo "失败" > "$status_file"
+        log_message "更新 Zypper 仓库信息..."
+        if ! safe_exec zypper refresh; then
+            log_message "Zypper 仓库更新失败"
+        else
+            log_message "Zypper 仓库更新成功"
+            log_message "更新软件包..."
+            if ! safe_exec zypper update -y; then
+                log_message "Zypper 更新失败"
+                echo "失败" > "$status_file"
+            else
+                log_message "Zypper 更新成功"
+            fi
         fi
 
     elif command -v opkg &>/dev/null; then
+        log_message "检测到 OPKG，使用 OpenWRT 的 opkg 进行更新..."
         echo -e "检测到 OPKG，使用 OpenWRT 的 opkg 进行更新..."
-        if ! (safe_exec opkg update && safe_exec opkg upgrade); then
-            echo "失败" > "$status_file"
+        log_message "更新 OPKG 仓库信息..."
+        if ! safe_exec opkg update; then
+            log_message "OPKG 仓库更新失败"
+        else
+            log_message "OPKG 仓库更新成功"
+            log_message "更新软件包..."
+            if ! safe_exec opkg upgrade; then
+                log_message "OPKG 更新失败"
+                echo "失败" > "$status_file"
+            else
+                log_message "OPKG 更新成功"
+            fi
         fi
 
     else
+        log_message "未知的包管理器，无法更新系统！"
         echo -e "未知的包管理器，无法更新系统！"
         echo "失败" > "$status_file"
     fi
@@ -145,7 +259,16 @@ system_update() {
     local update_status=$(cat "$status_file")
     rm -f "$status_file"
     
+    log_message "系统更新${update_status}！"
     echo -e "系统更新${update_status}！"
+    
+    # 在日志中添加完成标记
+    if [ "$update_status" = "成功" ]; then
+        log_message "系统更新成功！"
+    else
+        log_message "系统更新失败！"
+    fi
+    
     return 0
 }
 
@@ -175,7 +298,7 @@ show_system_update() {
         system_update | tee "$log_file"
         
         # 检查更新是否成功（根据日志内容）
-        if grep -q "系统更新成功" "$log_file"; then
+        if grep -q "系统更新成功" "$log_file" || grep -q "系统更新成功" "$DETAILED_LOG"; then
             update_status="成功"
         else
             update_status="失败"
@@ -190,6 +313,10 @@ show_system_update() {
         echo -e "${BLUE}${SEPARATOR}${RESET}"
         
         echo ""
+        echo -e "详细日志已保存至: ${YELLOW}$DETAILED_LOG${RESET}"
+        echo "可以使用以下命令查看详细日志:"
+        echo -e "${BLUE}cat $DETAILED_LOG${RESET}"
+        echo ""
         echo "按Enter键继续..."
         read
     else
@@ -197,8 +324,8 @@ show_system_update() {
         read dialog_height dialog_width <<< $(get_dialog_size)
         
         # 首先显示一个infobox，告知用户更新已经开始
-        dialog --title "系统更新" --infobox "准备执行系统更新，正在初始化..." 5 40
-        sleep 1
+        dialog --title "系统更新" --infobox "准备执行系统更新，正在初始化...\n\n详细日志将保存到: $DETAILED_LOG" 8 60
+        sleep 2
         
         # 确保临时目录存在
         mkdir -p /tmp/servermaster
@@ -208,20 +335,20 @@ show_system_update() {
         echo "正在初始化系统更新..." > "$update_file"
         
         # 启动tailbox对话框以实时显示更新日志（使用tailbox而不是tailboxbg）
-        dialog --title "系统更新进度" --begin 3 3 --tailbox "$update_file" $((dialog_height-6)) $((dialog_width-6)) 2>&1 >/dev/tty &
+        dialog --title "系统更新进度" --begin 3 3 --tailbox "$update_file" $((dialog_height-10)) $((dialog_width-6)) 2>&1 >/dev/tty &
         dialog_pid=$!
         
         # 执行系统更新并将输出重定向到文件
         {
-            echo "开始系统更新过程..."
-            echo "$SEPARATOR"
+            echo "开始系统更新过程..." | tee -a "$update_file"
+            echo "$SEPARATOR" | tee -a "$update_file"
             # 执行更新并同时写入日志文件
             system_update | tee -a "$update_file" "$log_file"
             update_result=$?
-            echo "$SEPARATOR"
+            echo "$SEPARATOR" | tee -a "$update_file"
             
             # 根据日志内容判断是否成功
-            if grep -q "系统更新成功" "$log_file"; then
+            if grep -q "系统更新成功" "$log_file" || grep -q "系统更新成功" "$DETAILED_LOG"; then
                 echo -e "系统更新完成！" | tee -a "$update_file"
                 update_status="成功"
             else
@@ -230,6 +357,7 @@ show_system_update() {
             fi
             
             echo "等待5秒后关闭此窗口..." | tee -a "$update_file"
+            echo "详细日志已保存至: $DETAILED_LOG" | tee -a "$update_file"
             sleep 5
             
             # 结束dialog进程
@@ -243,13 +371,17 @@ show_system_update() {
         if [ -s "$log_file" ]; then
             update_log=$(cat "$log_file")
         else
-            update_log="警告：更新日志为空，这可能是因为系统更新过程中没有产生输出或发生了错误。"
+            if [ -s "$DETAILED_LOG" ]; then
+                update_log="更新进程未产生标准输出。请查看详细日志了解更多信息: $DETAILED_LOG"
+            else
+                update_log="警告：更新日志为空，这可能是因为系统更新过程中没有产生输出或发生了错误。"
+            fi
         fi
         
         if [ "$update_status" = "成功" ]; then
-            dialog --title "系统更新" --msgbox "系统更新完成！\n\n更新日志:\n$update_log" $dialog_height $dialog_width
+            dialog --title "系统更新" --msgbox "系统更新完成！\n\n更新日志:\n$update_log\n\n详细日志已保存至: $DETAILED_LOG" $dialog_height $dialog_width
         else
-            dialog --title "系统更新" --msgbox "系统更新失败！\n\n更新日志:\n$update_log" $dialog_height $dialog_width
+            dialog --title "系统更新" --msgbox "系统更新失败！\n\n更新日志:\n$update_log\n\n详细日志已保存至: $DETAILED_LOG" $dialog_height $dialog_width
         fi
         
         # 清理临时文件
@@ -258,7 +390,17 @@ show_system_update() {
     
     # 清理临时文件
     rm -f "$log_file"
+    
+    # 提示用户日志文件位置
+    log_message "系统更新执行结束。详细日志已保存至: $DETAILED_LOG"
 }
+
+# 检查是否有参数要求直接运行系统更新
+if [ "$1" = "--direct" ]; then
+    # 直接执行系统更新，不显示界面
+    system_update
+    exit 0
+fi
 
 # 直接显示系统更新界面，不再显示菜单
 show_system_update
