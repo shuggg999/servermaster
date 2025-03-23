@@ -36,6 +36,22 @@ USE_TEXT_MODE=true
 MAX_RETRIES=3
 CONNECTION_TIMEOUT=10
 
+# 智能执行命令函数（替代sudo）
+safe_exec() {
+    # 如果用户是root，直接执行命令
+    if [ "$(id -u)" -eq 0 ]; then
+        eval "$@"
+    # 如果系统有sudo命令，使用sudo执行
+    elif command -v sudo &> /dev/null; then
+        sudo "$@"
+    # 如果都不满足，提示错误
+    else
+        echo -e "[\033[31mERROR\033[0m] 需要root权限执行该命令，但系统中没有sudo命令"
+        echo -e "请使用root用户执行此脚本，或安装sudo软件包"
+        return 1
+    fi
+}
+
 # 日志函数
 log() {
     local level="$1"
@@ -109,7 +125,7 @@ check_system() {
         
         while [ $retry_count -lt $MAX_RETRIES ] && [ "$install_success" = false ]; do
             if command -v apt &> /dev/null; then
-                if apt update && apt install -y $missing_tools; then
+                if safe_exec apt update && safe_exec apt install -y $missing_tools; then
                     install_success=true
                     log "SUCCESS" "已安装工具: $missing_tools"
                 else
@@ -123,7 +139,7 @@ check_system() {
                     fi
                 fi
             elif command -v yum &> /dev/null; then
-                if yum install -y $missing_tools; then
+                if safe_exec yum install -y $missing_tools; then
                     install_success=true
                     log "SUCCESS" "已安装工具: $missing_tools"
                 else
@@ -137,7 +153,7 @@ check_system() {
                     fi
                 fi
             elif command -v apk &> /dev/null; then
-                if apk add $missing_tools; then
+                if safe_exec apk add $missing_tools; then
                     install_success=true
                     log "SUCCESS" "已安装工具: $missing_tools"
                 else
@@ -610,14 +626,10 @@ main() {
     finalize
 }
 
-# 检查是否为root用户
+# 检查是否为root用户，无需root直接给出明确警告
 if [ "$(id -u)" -ne 0 ]; then
-    if command -v dialog &> /dev/null; then
-        dialog --title "错误" --msgbox "此脚本需要root权限运行！\n请使用sudo或以root用户身份运行此脚本。" 8 50
-    else
-        echo "错误: 此脚本需要root权限运行！"
-        echo "请使用sudo或以root用户身份运行此脚本。"
-    fi
+    echo "[\033[31mERROR\033[0m] 此脚本需要root权限运行！"
+    echo "请使用root用户直接运行此脚本，或使用sudo命令提升权限。"
     exit 1
 fi
 

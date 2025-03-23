@@ -27,23 +27,39 @@ RED="\033[1;31m"
 RESET="\033[0m"
 SEPARATOR="------------------------------------------------------"
 
+# 智能执行命令函数（替代sudo）
+safe_exec() {
+    # 如果用户是root，直接执行命令
+    if [ "$(id -u)" -eq 0 ]; then
+        eval "$@"
+    # 如果系统有sudo命令，使用sudo执行
+    elif command -v sudo &> /dev/null; then
+        sudo "$@"
+    # 如果都不满足，提示错误
+    else
+        echo -e "${RED}错误: 需要root权限执行该命令，但系统中没有sudo命令${RESET}"
+        echo -e "${YELLOW}请使用root用户执行此脚本，或安装sudo软件包${RESET}"
+        return 1
+    fi
+}
+
 # 修复 dpkg 可能的中断问题（更安全）
 fix_dpkg_safe() {
     echo -e "检查并修复 dpkg 相关问题..."
 
     # 查找是否有 apt/dpkg 进程占用锁文件
-    if sudo lsof /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock &>/dev/null; then
+    if safe_exec lsof /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock &>/dev/null; then
         echo -e "检测到 dpkg 被占用，尝试优雅终止相关进程..."
         
         # 获取占用进程的 PID
-        PIDS=$(sudo lsof -t /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock)
+        PIDS=$(safe_exec lsof -t /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock)
         for PID in $PIDS; do
             echo -e "终止进程: $PID"
-            sudo kill -TERM $PID  # 先尝试优雅终止
+            safe_exec kill -TERM $PID  # 先尝试优雅终止
             sleep 2  # 等待进程退出
             if ps -p $PID &>/dev/null; then
                 echo -e "进程 $PID 未能终止，执行强制终止..."
-                sudo kill -9 $PID  # 若进程仍未退出，则强制终止
+                safe_exec kill -9 $PID  # 若进程仍未退出，则强制终止
             fi
         done
     else
@@ -52,20 +68,20 @@ fix_dpkg_safe() {
 
     # 停止系统自动更新服务（适用于 Ubuntu/Debian）
     echo -e "停止 apt 相关的自动更新服务..."
-    sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null
-    sudo systemctl disable apt-daily.service apt-daily-upgrade.service 2>/dev/null
+    safe_exec systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null
+    safe_exec systemctl disable apt-daily.service apt-daily-upgrade.service 2>/dev/null
 
     # 确保锁文件被删除
     echo -e "删除 dpkg 锁文件..."
-    sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
+    safe_exec rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
 
     # 修复 dpkg 未完成的安装
     echo -e "修复 dpkg 配置..."
-    sudo dpkg --configure -a
+    safe_exec dpkg --configure -a
 
     # 再次启用自动更新服务
     echo -e "重新启用 apt 自动更新服务..."
-    sudo systemctl enable apt-daily.service apt-daily-upgrade.service 2>/dev/null
+    safe_exec systemctl enable apt-daily.service apt-daily-upgrade.service 2>/dev/null
 }
 
 # 统一系统更新方法，兼容多种 Linux 发行版
@@ -78,46 +94,46 @@ system_update() {
 
     if command -v dnf &>/dev/null; then
         echo -e "检测到 DNF，使用 DNF 进行更新..."
-        if ! sudo dnf -y update; then
+        if ! safe_exec dnf -y update; then
             echo "失败" > "$status_file"
         fi
 
     elif command -v yum &>/dev/null; then
         echo -e "检测到 YUM，使用 YUM 进行更新..."
-        if ! sudo yum -y update; then
+        if ! safe_exec yum -y update; then
             echo "失败" > "$status_file"
         fi
 
     elif command -v apt &>/dev/null; then
         echo -e "检测到 APT，使用 APT 进行更新..."
         fix_dpkg_safe  # 修复 dpkg 可能的中断问题
-        sudo DEBIAN_FRONTEND=noninteractive apt update -y
-        if ! sudo DEBIAN_FRONTEND=noninteractive apt full-upgrade -y; then
+        safe_exec DEBIAN_FRONTEND=noninteractive apt update -y
+        if ! safe_exec DEBIAN_FRONTEND=noninteractive apt full-upgrade -y; then
             echo "失败" > "$status_file"
         fi
 
     elif command -v apk &>/dev/null; then
         echo -e "检测到 APK，使用 Alpine 的 apk 进行更新..."
-        if ! (sudo apk update && sudo apk upgrade); then
+        if ! (safe_exec apk update && safe_exec apk upgrade); then
             echo "失败" > "$status_file"
         fi
 
     elif command -v pacman &>/dev/null; then
         echo -e "检测到 Pacman，使用 Arch Linux 的 pacman 进行更新..."
-        if ! sudo pacman -Syu --noconfirm; then
+        if ! safe_exec pacman -Syu --noconfirm; then
             echo "失败" > "$status_file"
         fi
 
     elif command -v zypper &>/dev/null; then
         echo -e "检测到 Zypper，使用 OpenSUSE 的 zypper 进行更新..."
-        sudo zypper refresh
-        if ! sudo zypper update -y; then
+        safe_exec zypper refresh
+        if ! safe_exec zypper update -y; then
             echo "失败" > "$status_file"
         fi
 
     elif command -v opkg &>/dev/null; then
         echo -e "检测到 OPKG，使用 OpenWRT 的 opkg 进行更新..."
-        if ! (sudo opkg update && sudo opkg upgrade); then
+        if ! (safe_exec opkg update && safe_exec opkg upgrade); then
             echo "失败" > "$status_file"
         fi
 
