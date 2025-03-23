@@ -193,26 +193,57 @@ show_system_update() {
         echo "按Enter键继续..."
         read
     else
-        # 使用Dialog显示进度
-        dialog --title "系统更新" --infobox "正在执行系统更新，请稍候..." 5 40
-        
-        # 执行系统更新并捕获输出到日志文件
-        system_update > "$log_file" 2>&1
-        
-        # 检查更新是否成功
-        if grep -q "系统更新成功" "$log_file"; then
-            update_status="成功"
-        else
-            update_status="失败"
-        fi
-        
         # 获取对话框尺寸
         read dialog_height dialog_width <<< $(get_dialog_size)
         
-        # 获取日志内容
+        # 首先显示一个infobox，告知用户更新已经开始
+        dialog --title "系统更新" --infobox "准备执行系统更新，正在初始化..." 5 40
+        sleep 1
+        
+        # 创建一个FIFO管道用于实时更新dialog
+        update_pipe=$(mktemp -u)
+        mkfifo "$update_pipe"
+        
+        # 启动tailboxbg对话框以实时显示更新日志
+        dialog --title "系统更新进度" \
+               --begin 2 2 \
+               --tailboxbg "$update_pipe" $((dialog_height-4)) $((dialog_width-4)) \
+               --and-widget \
+               --begin $((dialog_height-2)) 2 \
+               --infobox "正在执行系统更新，请稍候..." 2 $((dialog_width-4)) \
+               2>&1 >/dev/tty &
+        
+        dialog_pid=$!
+        
+        # 执行系统更新并将输出重定向到FIFO管道和日志文件
+        {
+            echo "开始系统更新过程..."
+            echo "$SEPARATOR"
+            system_update | tee -a "$log_file"
+            echo "$SEPARATOR"
+            if grep -q "系统更新成功" "$log_file"; then
+                echo -e "系统更新完成！"
+                update_status="成功"
+            else
+                echo -e "系统更新失败！请检查日志详情。"
+                update_status="失败"
+            fi
+            echo "等待3秒后关闭此窗口..."
+            sleep 3
+            
+            # 结束dialog进程
+            kill $dialog_pid 2>/dev/null
+        } > "$update_pipe" &
+        
+        # 等待dialog进程结束
+        wait $dialog_pid 2>/dev/null
+        
+        # 关闭FIFO管道
+        rm -f "$update_pipe"
+        
+        # 显示更新结果
         update_log=$(cat "$log_file")
         
-        # 显示结果
         if [ "$update_status" = "成功" ]; then
             dialog --title "系统更新" --msgbox "系统更新完成！\n\n更新日志:\n$update_log" $dialog_height $dialog_width
         else
