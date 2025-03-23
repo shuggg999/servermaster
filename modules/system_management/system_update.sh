@@ -272,6 +272,16 @@ system_update() {
     return 0
 }
 
+# 更新Dialog显示内容的函数（避免滚动）
+update_dialog_content() {
+    local source_file="$1"
+    local target_file="$2"
+    local lines=$3
+    
+    # 获取最新的行数
+    tail -n "$lines" "$source_file" > "$target_file"
+}
+
 # 显示系统更新执行界面
 show_system_update() {
     # 确保我们在正确的目录
@@ -298,7 +308,7 @@ show_system_update() {
         system_update | tee "$log_file"
         
         # 检查更新是否成功（根据日志内容）
-        if grep -q "系统更新成功" "$log_file" || grep -q "系统更新成功" "$DETAILED_LOG"; then
+        if grep -q "更新成功" "$log_file" || grep -q "更新成功" "$DETAILED_LOG"; then
             update_status="成功"
         else
             update_status="失败"
@@ -330,62 +340,97 @@ show_system_update() {
         # 确保临时目录存在
         mkdir -p /tmp/servermaster
         
-        # 创建一个文件而不是FIFO管道（更可靠）
-        update_file="/tmp/servermaster/update_log.txt"
-        echo "正在初始化系统更新..." > "$update_file"
+        # 创建两个临时文件：一个存放完整日志，一个用于显示
+        update_full_file="/tmp/servermaster/update_full.txt"
+        update_display_file="/tmp/servermaster/update_display.txt"
+        echo "正在初始化系统更新..." > "$update_full_file"
+        echo "正在初始化系统更新..." > "$update_display_file"
         
-        # 启动tailbox对话框以实时显示更新日志（使用tailbox而不是tailboxbg）
-        dialog --title "系统更新进度" --begin 3 3 --tailbox "$update_file" $((dialog_height-10)) $((dialog_width-6)) 2>&1 >/dev/tty &
+        # 创建一个后台进程来定期更新显示内容
+        {
+            local display_lines=$((dialog_height-12))
+            while [ -f "$update_full_file" ]; do
+                update_dialog_content "$update_full_file" "$update_display_file" "$display_lines"
+                sleep 0.5
+            done
+        } &
+        updater_pid=$!
+        
+        # 启动dialog对话框以显示更新日志
+        dialog --title "系统更新进度" --begin 3 3 --tailbox "$update_display_file" $((dialog_height-10)) $((dialog_width-6)) 2>&1 >/dev/tty &
         dialog_pid=$!
         
         # 执行系统更新并将输出重定向到文件
         {
-            echo "开始系统更新过程..." | tee -a "$update_file"
-            echo "$SEPARATOR" | tee -a "$update_file"
-            # 执行更新并同时写入日志文件
-            system_update | tee -a "$update_file" "$log_file"
+            # 输出到完整日志文件
+            echo "开始系统更新过程..." >> "$update_full_file"
+            echo "$SEPARATOR" >> "$update_full_file"
+            
+            # 执行更新并写入日志
+            system_update >> "$update_full_file" 2>&1
             update_result=$?
-            echo "$SEPARATOR" | tee -a "$update_file"
+            
+            echo "$SEPARATOR" >> "$update_full_file"
             
             # 根据日志内容判断是否成功
-            if grep -q "系统更新成功" "$log_file" || grep -q "系统更新成功" "$DETAILED_LOG"; then
-                echo -e "系统更新完成！" | tee -a "$update_file"
+            if grep -q "更新成功" "$DETAILED_LOG"; then
+                echo "系统更新完成！" >> "$update_full_file"
                 update_status="成功"
             else
-                echo -e "系统更新失败！请检查日志详情。" | tee -a "$update_file"
+                echo "系统更新失败！请检查日志详情。" >> "$update_full_file"
                 update_status="失败"
             fi
             
-            echo "等待5秒后关闭此窗口..." | tee -a "$update_file"
-            echo "详细日志已保存至: $DETAILED_LOG" | tee -a "$update_file"
+            echo "等待5秒后关闭此窗口..." >> "$update_full_file"
+            echo "详细日志已保存至: $DETAILED_LOG" >> "$update_full_file"
             sleep 5
+            
+            # 结束更新进程
+            kill $updater_pid 2>/dev/null
             
             # 结束dialog进程
             kill $dialog_pid 2>/dev/null
+            
+            # 删除标记文件以终止更新器
+            rm -f "$update_full_file"
         } &
         
         # 等待dialog进程结束
         wait $dialog_pid 2>/dev/null
         
-        # 显示更新结果
-        if [ -s "$log_file" ]; then
-            update_log=$(cat "$log_file")
+        # 确保更新器进程已终止
+        kill $updater_pid 2>/dev/null
+        
+        # 读取日志并格式化显示
+        if [ -s "$DETAILED_LOG" ]; then
+            # 提取最多30行关键日志信息
+            update_log=$(grep -E "(开始进行系统更新|检测到操作系统|更新成功|更新失败|系统更新成功|系统更新失败)" "$DETAILED_LOG" | tail -n 30)
+            
+            # 创建一个格式化的日志显示数组
+            log_entries=()
+            while IFS= read -r line; do
+                log_entries+=("$line")
+            done <<< "$update_log"
+            
+            # 组合显示内容
+            display_text="系统更新${update_status}！\n\n系统更新日志:\n"
+            for entry in "${log_entries[@]}"; do
+                display_text="${display_text}${entry}\n"
+            done
+            display_text="${display_text}\n详细日志已保存至: $DETAILED_LOG"
         else
-            if [ -s "$DETAILED_LOG" ]; then
-                update_log="更新进程未产生标准输出。请查看详细日志了解更多信息: $DETAILED_LOG"
-            else
-                update_log="警告：更新日志为空，这可能是因为系统更新过程中没有产生输出或发生了错误。"
-            fi
+            display_text="警告：更新日志为空，这可能是因为系统更新过程中没有产生输出或发生了错误。"
         fi
         
+        # 显示最终结果
         if [ "$update_status" = "成功" ]; then
-            dialog --title "系统更新" --msgbox "系统更新完成！\n\n更新日志:\n$update_log\n\n详细日志已保存至: $DETAILED_LOG" $dialog_height $dialog_width
+            dialog --title "系统更新" --msgbox "$display_text" $dialog_height $dialog_width
         else
-            dialog --title "系统更新" --msgbox "系统更新失败！\n\n更新日志:\n$update_log\n\n详细日志已保存至: $DETAILED_LOG" $dialog_height $dialog_width
+            dialog --title "系统更新" --msgbox "$display_text" $dialog_height $dialog_width
         fi
         
         # 清理临时文件
-        rm -f "$update_file"
+        rm -f "$update_display_file" "$update_full_file"
     fi
     
     # 清理临时文件
