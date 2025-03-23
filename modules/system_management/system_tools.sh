@@ -127,7 +127,7 @@ show_env_config_menu() {
             echo "  2) 修改登录密码            7) 一键重装系统"
             echo "  3) ROOT密码登录模式        8) 切换优先ipv4/ipv6"
             echo "  4) 安装Python指定版本      9) 切换系统更新源"
-            echo "  5) 修改SSH连接端口         \033[31m10\033[0m) 修改主机名"
+            echo "  5) 修改SSH连接端口         10) 修改主机名"
             echo ""
             echo "  \033[31m0\033[0m) 返回上级菜单"
             echo ""
