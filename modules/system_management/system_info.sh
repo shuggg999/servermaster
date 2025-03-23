@@ -19,89 +19,163 @@ fi
 # 保存当前目录
 CURRENT_DIR="$(pwd)"
 
-# 显示系统信息查询菜单
-show_system_info_menu() {
-    local title="系统信息查询"
-    local menu_items=(
-        "1" "系统概览 - 显示系统基本信息"
-        "2" "硬件信息 - 查看CPU/内存/磁盘详情"
-        "3" "网络信息 - 查看网络接口与连接状态"
-        "4" "系统状态 - 查看系统负载与运行状态"
-        "5" "服务状态 - 显示关键系统服务状态"
-        "0" "返回上级菜单"
-    )
+# 显示系统信息
+show_system_info() {
+    # 确保我们在正确的目录
+    cd "$INSTALL_DIR"
     
-    while true; do
-        # 确保我们在正确的目录
-        cd "$INSTALL_DIR"
+    clear
+    
+    # 获取IP地址信息
+    ip_address_info() {
+        ipv4_address=$(curl -s4 --max-time 5 ip.sb)
+        ipv6_address=$(curl -s6 --max-time 5 ip.sb)
+    }
+    
+    ip_address_info
+    
+    # 获取CPU信息
+    local cpu_info=$(lscpu | awk -F': +' '/Model name:/ {print $2; exit}')
+    
+    # 获取CPU使用率
+    local cpu_usage_percent=$(awk '{u=$2+$4; t=$2+$4+$5; if (NR==1){u1=u; t1=t;} else printf "%.0f\n", (($2+$4-u1) * 100 / (t-t1))}' \
+        <(grep 'cpu ' /proc/stat) <(sleep 1; grep 'cpu ' /proc/stat))
+    
+    # 获取CPU核心数
+    local cpu_cores=$(nproc)
+    
+    # 获取CPU频率
+    local cpu_freq=$(cat /proc/cpuinfo | grep "MHz" | head -n 1 | awk '{printf "%.1f GHz\n", $4/1000}')
+    
+    # 获取内存信息
+    local mem_info=$(free -b | awk 'NR==2{printf "%.2f/%.2fM (%.2f%%)", $3/1024/1024, $2/1024/1024, $3*100/$2}')
+    
+    # 获取磁盘信息
+    local disk_info=$(df -h | awk '$NF=="/"{printf "%s/%s (%s)", $3, $2, $5}')
+    
+    # 获取IP地理位置信息
+    local ipinfo=$(curl -s ipinfo.io)
+    local country=$(echo "$ipinfo" | grep 'country' | awk -F': ' '{print $2}' | tr -d '",')
+    local city=$(echo "$ipinfo" | grep 'city' | awk -F': ' '{print $2}' | tr -d '",')
+    local isp_info=$(echo "$ipinfo" | grep 'org' | awk -F': ' '{print $2}' | tr -d '",')
+    
+    # 获取系统负载
+    local load=$(uptime | awk '{print $(NF-2), $(NF-1), $NF}')
+    
+    # 获取DNS地址
+    local dns_addresses=$(awk '/^nameserver/{printf "%s ", $2} END {print ""}' /etc/resolv.conf)
+    
+    # 获取CPU架构
+    local cpu_arch=$(uname -m)
+    
+    # 获取主机名
+    local hostname=$(uname -n)
+    
+    # 获取内核版本
+    local kernel_version=$(uname -r)
+    
+    # 获取网络算法
+    local congestion_algorithm=$(sysctl -n net.ipv4.tcp_congestion_control)
+    local queue_algorithm=$(sysctl -n net.core.default_qdisc)
+    
+    # 获取操作系统信息
+    local os_info=$(grep PRETTY_NAME /etc/os-release | cut -d '=' -f2 | tr -d '"')
+    
+    # 获取虚拟内存信息
+    local swap_info=$(free -m | awk 'NR==3{used=$3; total=$2; if (total == 0) {percentage=0} else {percentage=used*100/total}; printf "%dM/%dM (%d%%)", used, total, percentage}')
+    
+    # 获取运行时长
+    local runtime=$(cat /proc/uptime | awk -F. '{run_days=int($1 / 86400);run_hours=int(($1 % 86400) / 3600);run_minutes=int(($1 % 3600) / 60); if (run_days > 0) printf("%d天 ", run_days); if (run_hours > 0) printf("%d时 ", run_hours); printf("%d分\n", run_minutes)}')
+    
+    # 获取时区和当前时间
+    local current_time=$(date "+%Y-%m-%d %I:%M %p")
+    local timezone=$(date +%Z)
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        clear
+        echo "====================================================="
+        echo "      系统信息查询                                    "
+        echo "====================================================="
+        echo ""
+        echo "-------------"
+        echo "主机名:       $hostname"
+        echo "系统版本:     $os_info"
+        echo "Linux版本:    $kernel_version"
+        echo "-------------"
+        echo "CPU架构:      $cpu_arch"
+        echo "CPU型号:      $cpu_info"
+        echo "CPU核心数:    $cpu_cores"
+        echo "CPU频率:      $cpu_freq"
+        echo "-------------"
+        echo "CPU占用:      $cpu_usage_percent%"
+        echo "系统负载:     $load"
+        echo "物理内存:     $mem_info"
+        echo "虚拟内存:     $swap_info"
+        echo "硬盘占用:     $disk_info"
+        echo "-------------"
+        echo "网络算法:     $congestion_algorithm $queue_algorithm"
+        echo "-------------"
+        echo "运营商:       $isp_info"
+        if [ -n "$ipv4_address" ]; then
+            echo "IPv4地址:     $ipv4_address"
+        fi
+        if [ -n "$ipv6_address" ]; then
+            echo "IPv6地址:     $ipv6_address"
+        fi
+        echo "DNS地址:      $dns_addresses"
+        echo "地理位置:     $country $city"
+        echo "系统时间:     $timezone $current_time"
+        echo "-------------"
+        echo "运行时长:     $runtime"
+        echo ""
+        echo "按Enter键继续..."
+        read
+    else
+        # 使用Dialog显示系统信息
+        # 构建对话框显示信息
+        local info_text="主机名:       $hostname\n"
+        info_text+="系统版本:     $os_info\n"
+        info_text+="Linux版本:    $kernel_version\n"
+        info_text+="-------------\n"
+        info_text+="CPU架构:      $cpu_arch\n"
+        info_text+="CPU型号:      $cpu_info\n"
+        info_text+="CPU核心数:    $cpu_cores\n"
+        info_text+="CPU频率:      $cpu_freq\n"
+        info_text+="-------------\n"
+        info_text+="CPU占用:      $cpu_usage_percent%\n"
+        info_text+="系统负载:     $load\n"
+        info_text+="物理内存:     $mem_info\n"
+        info_text+="虚拟内存:     $swap_info\n"
+        info_text+="硬盘占用:     $disk_info\n"
+        info_text+="-------------\n"
+        info_text+="网络算法:     $congestion_algorithm $queue_algorithm\n"
+        info_text+="-------------\n"
+        info_text+="运营商:       $isp_info\n"
         
-        if [ "$USE_TEXT_MODE" = true ]; then
-            clear
-            echo "====================================================="
-            echo "      系统信息查询                                    "
-            echo "====================================================="
-            echo ""
-            echo "  1) 系统概览"
-            echo "  2) 硬件信息"
-            echo "  3) 网络信息"
-            echo "  4) 系统状态"
-            echo "  5) 服务状态"
-            echo ""
-            echo "  0) 返回上级菜单"
-            echo ""
-            read -p "请选择操作 [0-5]: " choice
-        else
-            # 获取对话框尺寸
-            read dialog_height dialog_width <<< $(get_dialog_size)
-            
-            # 使用Dialog显示菜单
-            choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 6 \
-                "${menu_items[@]}" 2>&1 >/dev/tty)
-            
-            # 检查是否按下ESC或Cancel
-            local status=$?
-            if [ $status -ne 0 ]; then
-                cd "$CURRENT_DIR"  # 恢复原始目录
-                return
-            fi
+        if [ -n "$ipv4_address" ]; then
+            info_text+="IPv4地址:     $ipv4_address\n"
         fi
         
-        # 这里只是占位，具体功能实现会在后续开发中添加
-        case $choice in
-            1|2|3|4|5) 
-                if [ "$USE_TEXT_MODE" = true ]; then
-                    echo "该功能尚未实现"
-                    sleep 2
-                else
-                    dialog --title "提示" --msgbox "该功能尚未实现" 8 40
-                fi
-                ;;
-            0) 
-                cd "$CURRENT_DIR"  # 恢复原始目录
-                return 
-                ;;
-            *) 
-                if [ "$USE_TEXT_MODE" = true ]; then
-                    echo "无效选择，请重试"
-                    sleep 1
-                else
-                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 8 40
-                fi
-                ;;
-        esac
-        
-        # 文本模式下，显示按键提示
-        if [ "$USE_TEXT_MODE" = true ]; then
-            echo ""
-            echo "按Enter键继续..."
-            read
+        if [ -n "$ipv6_address" ]; then
+            info_text+="IPv6地址:     $ipv6_address\n"
         fi
-    done
+        
+        info_text+="DNS地址:      $dns_addresses\n"
+        info_text+="地理位置:     $country $city\n"
+        info_text+="系统时间:     $timezone $current_time\n"
+        info_text+="-------------\n"
+        info_text+="运行时长:     $runtime\n"
+        
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        # 使用Dialog显示信息
+        dialog --title "系统信息查询" --msgbox "$info_text" $dialog_height $dialog_width
+    fi
 }
 
-# 运行菜单
-show_system_info_menu
+# 直接显示系统信息，不再显示菜单
+show_system_info
 
 # 确保在脚本结束时恢复原始目录
 cd "$CURRENT_DIR" 
