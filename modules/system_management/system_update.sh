@@ -145,7 +145,7 @@ system_update() {
     local update_status=$(cat "$status_file")
     rm -f "$status_file"
     
-    echo -e "系统更新$update_status！"
+    echo -e "系统更新${update_status}！"
     return 0
 }
 
@@ -171,10 +171,10 @@ show_system_update() {
         echo -e "${BLUE}${SEPARATOR}${RESET}"
         echo ""
         
-        # 执行系统更新并捕获输出到日志文件
+        # 执行系统更新并直接输出到终端和日志文件
         system_update | tee "$log_file"
         
-        # 检查更新是否成功（根据输出中是否包含"系统更新成功"）
+        # 检查更新是否成功（根据日志内容）
         if grep -q "系统更新成功" "$log_file"; then
             update_status="成功"
         else
@@ -200,55 +200,60 @@ show_system_update() {
         dialog --title "系统更新" --infobox "准备执行系统更新，正在初始化..." 5 40
         sleep 1
         
-        # 创建一个FIFO管道用于实时更新dialog
-        update_pipe=$(mktemp -u)
-        mkfifo "$update_pipe"
+        # 确保临时目录存在
+        mkdir -p /tmp/servermaster
         
-        # 启动tailboxbg对话框以实时显示更新日志
-        dialog --title "系统更新进度" \
-               --begin 2 2 \
-               --tailboxbg "$update_pipe" $((dialog_height-4)) $((dialog_width-4)) \
-               --and-widget \
-               --begin $((dialog_height-2)) 2 \
-               --infobox "正在执行系统更新，请稍候..." 2 $((dialog_width-4)) \
-               2>&1 >/dev/tty &
+        # 创建一个文件而不是FIFO管道（更可靠）
+        update_file="/tmp/servermaster/update_log.txt"
+        echo "正在初始化系统更新..." > "$update_file"
         
+        # 启动tailbox对话框以实时显示更新日志（使用tailbox而不是tailboxbg）
+        dialog --title "系统更新进度" --begin 3 3 --tailbox "$update_file" $((dialog_height-6)) $((dialog_width-6)) 2>&1 >/dev/tty &
         dialog_pid=$!
         
-        # 执行系统更新并将输出重定向到FIFO管道和日志文件
+        # 执行系统更新并将输出重定向到文件
         {
             echo "开始系统更新过程..."
             echo "$SEPARATOR"
-            system_update | tee -a "$log_file"
+            # 执行更新并同时写入日志文件
+            system_update | tee -a "$update_file" "$log_file"
+            update_result=$?
             echo "$SEPARATOR"
+            
+            # 根据日志内容判断是否成功
             if grep -q "系统更新成功" "$log_file"; then
-                echo -e "系统更新完成！"
+                echo -e "系统更新完成！" | tee -a "$update_file"
                 update_status="成功"
             else
-                echo -e "系统更新失败！请检查日志详情。"
+                echo -e "系统更新失败！请检查日志详情。" | tee -a "$update_file"
                 update_status="失败"
             fi
-            echo "等待3秒后关闭此窗口..."
-            sleep 3
+            
+            echo "等待5秒后关闭此窗口..." | tee -a "$update_file"
+            sleep 5
             
             # 结束dialog进程
             kill $dialog_pid 2>/dev/null
-        } > "$update_pipe" &
+        } &
         
         # 等待dialog进程结束
         wait $dialog_pid 2>/dev/null
         
-        # 关闭FIFO管道
-        rm -f "$update_pipe"
-        
         # 显示更新结果
-        update_log=$(cat "$log_file")
+        if [ -s "$log_file" ]; then
+            update_log=$(cat "$log_file")
+        else
+            update_log="警告：更新日志为空，这可能是因为系统更新过程中没有产生输出或发生了错误。"
+        fi
         
         if [ "$update_status" = "成功" ]; then
             dialog --title "系统更新" --msgbox "系统更新完成！\n\n更新日志:\n$update_log" $dialog_height $dialog_width
         else
             dialog --title "系统更新" --msgbox "系统更新失败！\n\n更新日志:\n$update_log" $dialog_height $dialog_width
         fi
+        
+        # 清理临时文件
+        rm -f "$update_file"
     fi
     
     # 清理临时文件
