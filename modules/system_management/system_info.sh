@@ -26,6 +26,13 @@ show_system_info() {
     
     clear
     
+    # 定义颜色
+    local GREEN="\033[1;32m"
+    local BLUE="\033[1;34m"
+    local YELLOW="\033[1;33m"
+    local RESET="\033[0m"
+    local SEPARATOR="------------------------------------------------------"
+    
     # 获取IP地址信息
     ip_address_info() {
         ipv4_address=$(curl -s4 --max-time 5 ip.sb)
@@ -94,39 +101,39 @@ show_system_info() {
     if [ "$USE_TEXT_MODE" = true ]; then
         clear
         echo "====================================================="
-        echo "      系统信息查询                                    "
+        echo -e "${GREEN}      系统信息查询                                    ${RESET}"
         echo "====================================================="
         echo ""
-        echo "-------------"
-        echo "主机名:       $hostname"
-        echo "系统版本:     $os_info"
-        echo "Linux版本:    $kernel_version"
-        echo "-------------"
-        echo "CPU架构:      $cpu_arch"
-        echo "CPU型号:      $cpu_info"
-        echo "CPU核心数:    $cpu_cores"
-        echo "CPU频率:      $cpu_freq"
-        echo "-------------"
-        echo "CPU占用:      $cpu_usage_percent%"
-        echo "系统负载:     $load"
-        echo "物理内存:     $mem_info"
-        echo "虚拟内存:     $swap_info"
-        echo "硬盘占用:     $disk_info"
-        echo "-------------"
-        echo "网络算法:     $congestion_algorithm $queue_algorithm"
-        echo "-------------"
-        echo "运营商:       $isp_info"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}主机名:       ${RESET}$hostname"
+        echo -e "${YELLOW}系统版本:     ${RESET}$os_info"
+        echo -e "${YELLOW}Linux版本:    ${RESET}$kernel_version"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}CPU架构:      ${RESET}$cpu_arch"
+        echo -e "${YELLOW}CPU型号:      ${RESET}$cpu_info"
+        echo -e "${YELLOW}CPU核心数:    ${RESET}$cpu_cores"
+        echo -e "${YELLOW}CPU频率:      ${RESET}$cpu_freq"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}CPU占用:      ${RESET}$cpu_usage_percent%"
+        echo -e "${YELLOW}系统负载:     ${RESET}$load"
+        echo -e "${YELLOW}物理内存:     ${RESET}$mem_info"
+        echo -e "${YELLOW}虚拟内存:     ${RESET}$swap_info"
+        echo -e "${YELLOW}硬盘占用:     ${RESET}$disk_info"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}网络算法:     ${RESET}$congestion_algorithm $queue_algorithm"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}运营商:       ${RESET}$isp_info"
         if [ -n "$ipv4_address" ]; then
-            echo "IPv4地址:     $ipv4_address"
+            echo -e "${YELLOW}IPv4地址:     ${RESET}$ipv4_address"
         fi
         if [ -n "$ipv6_address" ]; then
-            echo "IPv6地址:     $ipv6_address"
+            echo -e "${YELLOW}IPv6地址:     ${RESET}$ipv6_address"
         fi
-        echo "DNS地址:      $dns_addresses"
-        echo "地理位置:     $country $city"
-        echo "系统时间:     $timezone $current_time"
-        echo "-------------"
-        echo "运行时长:     $runtime"
+        echo -e "${YELLOW}DNS地址:      ${RESET}$dns_addresses"
+        echo -e "${YELLOW}地理位置:     ${RESET}$country $city"
+        echo -e "${YELLOW}系统时间:     ${RESET}$timezone $current_time"
+        echo -e "${BLUE}${SEPARATOR}${RESET}"
+        echo -e "${YELLOW}运行时长:     ${RESET}$runtime"
         echo ""
         echo "按Enter键继续..."
         read
@@ -136,20 +143,20 @@ show_system_info() {
         local info_text="主机名:       $hostname\n"
         info_text+="系统版本:     $os_info\n"
         info_text+="Linux版本:    $kernel_version\n"
-        info_text+="-------------\n"
+        info_text+="${SEPARATOR}\n"
         info_text+="CPU架构:      $cpu_arch\n"
         info_text+="CPU型号:      $cpu_info\n"
         info_text+="CPU核心数:    $cpu_cores\n"
         info_text+="CPU频率:      $cpu_freq\n"
-        info_text+="-------------\n"
+        info_text+="${SEPARATOR}\n"
         info_text+="CPU占用:      $cpu_usage_percent%\n"
         info_text+="系统负载:     $load\n"
         info_text+="物理内存:     $mem_info\n"
         info_text+="虚拟内存:     $swap_info\n"
         info_text+="硬盘占用:     $disk_info\n"
-        info_text+="-------------\n"
+        info_text+="${SEPARATOR}\n"
         info_text+="网络算法:     $congestion_algorithm $queue_algorithm\n"
-        info_text+="-------------\n"
+        info_text+="${SEPARATOR}\n"
         info_text+="运营商:       $isp_info\n"
         
         if [ -n "$ipv4_address" ]; then
@@ -163,7 +170,7 @@ show_system_info() {
         info_text+="DNS地址:      $dns_addresses\n"
         info_text+="地理位置:     $country $city\n"
         info_text+="系统时间:     $timezone $current_time\n"
-        info_text+="-------------\n"
+        info_text+="${SEPARATOR}\n"
         info_text+="运行时长:     $runtime\n"
         
         # 获取对话框尺寸
