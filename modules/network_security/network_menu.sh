@@ -67,7 +67,7 @@ show_network_security_menu() {
             1) execute_module "network_security/firewall_management.sh" ;;
             2) execute_module "network_security/bbr_manager.sh" ;;
             3) execute_module "network_security/warp_manager.sh" ;;
-            4) execute_module "network_security/vpn_proxy_services.sh" ;;
+            4) show_vpn_proxy_menu ;;
             5) execute_module "network_security/ssh_defense.sh" ;;
             6) execute_module "network_security/system_monitoring.sh" ;;
             7) execute_module "network_security/security_tools.sh" ;;
@@ -76,6 +76,67 @@ show_network_security_menu() {
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
                 ;;
+            *) 
+                if [ "$USE_TEXT_MODE" = true ]; then
+                    echo "无效选择，请重试"
+                    sleep 1
+                else
+                    dialog --title "错误" --msgbox "无效选项: $choice\n请重新选择" 8 40
+                fi
+                ;;
+        esac
+        
+        # 文本模式下，显示按键提示
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo ""
+            echo "按Enter键继续..."
+            read
+        fi
+    done
+}
+
+# VPN与代理服务子菜单
+show_vpn_proxy_menu() {
+    local title="VPN与代理服务"
+    local menu_items=(
+        "1" "Xray Reality VPN一键安装 - 自动配置订阅更新"
+        "2" "Xray手动更新 - 更新现有Xray配置"
+        "3" "其他代理工具 - 更多代理选项"
+        "0" "返回上级菜单"
+    )
+    
+    while true; do
+        if [ "$USE_TEXT_MODE" = true ]; then
+            clear
+            echo "====================================================="
+            echo "      VPN与代理服务菜单                              "
+            echo "====================================================="
+            echo ""
+            echo "  1) Xray Reality VPN一键安装"
+            echo "  2) Xray手动更新"
+            echo "  3) 其他代理工具"
+            echo ""
+            echo "  0) 返回上级菜单"
+            echo ""
+            read -p "请选择操作 [0-3]: " choice
+        else
+            # 使用Dialog显示菜单
+            choice=$(dialog --clear --title "$title" \
+                --menu "请选择一个选项:" 15 60 4 \
+                "${menu_items[@]}" 2>&1 >/dev/tty)
+            
+            # 检查是否按下ESC或Cancel
+            local status=$?
+            if [ $status -ne 0 ]; then
+                return
+            fi
+        fi
+        
+        case $choice in
+            1) execute_module "network_security/xray_setup.sh" ;;
+            2) execute_module "network_security/xray_update.sh" ;;
+            3) execute_module "network_security/other_proxy_tools.sh" ;;
+            0) return ;;
             *) 
                 if [ "$USE_TEXT_MODE" = true ]; then
                     echo "无效选择，请重试"
