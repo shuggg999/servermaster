@@ -72,6 +72,7 @@ show_system_management_menu() {
                 return
             fi
         fi
+         # 恢复原始目录
         
         case $choice in
             1) execute_module "system_management/system_info.sh" ;;

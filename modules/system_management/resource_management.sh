@@ -27,6 +27,7 @@ show_resource_management_menu() {
         "0" "返回上级菜单"
     )
     
+    
     while true; do
         # 确保我们在正确的目录
         cd "$INSTALL_DIR"
