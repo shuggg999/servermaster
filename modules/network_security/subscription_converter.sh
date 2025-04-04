@@ -34,6 +34,13 @@ SUBCONVERTER_CRON="/etc/cron.d/subconverter_refresh"
 SUBCONVERTER_LOG="/var/log/subconverter.log"
 SUBCONVERTER_DOCKER_COMPOSE="${SUBCONVERTER_DIR}/docker-compose.yml"
 SUBCONVERTER_MERGED_FILE="${SUBCONVERTER_DIR}/merged_subscriptions.txt"
+SUBCONVERTER_PROXY_DIR="${SUBCONVERTER_DIR}/proxy"
+SUBCONVERTER_PROXY_SCRIPT="${SUBCONVERTER_PROXY_DIR}/proxy_sub.sh"
+SUBCONVERTER_PROXY_CONFIG="/etc/nginx/conf.d/proxy_sub.conf"
+SUBCONVERTER_PROXY_CRON="/etc/cron.d/proxy_sub"
+SUBCONVERTER_PROXY_SUB="${SUBCONVERTER_PROXY_DIR}/converted_sub.txt"
+SUBCONVERTER_PROXY_LOG="${SUBCONVERTER_PROXY_DIR}/proxy_sub.log"
+SUBCONVERTER_PROXY_PORT="25501"
 
 # 默认设置
 DEFAULT_PORT="25500"
@@ -348,6 +355,120 @@ EOF
     systemctl restart nginx
 }
 
+# 配置订阅代理处理
+configure_subscription_proxy() {
+    local title="配置订阅代理"
+    local message="正在配置订阅代理处理..."
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+    else
+        show_progress_dialog "$title" "$message"
+    fi
+    
+    # 创建代理目录
+    mkdir -p "${SUBCONVERTER_PROXY_DIR}"
+    
+    # 创建代理处理脚本
+    cat > "${SUBCONVERTER_PROXY_SCRIPT}" << 'EOF'
+#!/bin/bash
+
+# 配置变量将在安装时替换
+ORIGINAL_SUB="__ORIGINAL_SUB__"
+LOCAL_SUB="__LOCAL_SUB__"
+LOG_FILE="__LOG_FILE__"
+
+# 记录日志
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+log "开始处理订阅..."
+
+# 下载原始订阅
+content=$(curl -s "$ORIGINAL_SUB")
+if [ -z "$content" ]; then
+    log "错误: 无法获取原始订阅内容"
+    exit 1
+fi
+
+# 检查是否需要做预处理（如base64解码）
+if [[ "$content" =~ ^vless:// ]] || [[ "$content" =~ ^vmess:// ]] || [[ "$content" =~ ^trojan:// ]] || [[ "$content" =~ ^ss:// ]]; then
+    # 已经是协议链接，直接保存
+    echo "$content" > "$LOCAL_SUB"
+    log "保存了$(echo "$content" | wc -l)个节点"
+elif [[ "$content" =~ ^[A-Za-z0-9+/=]+$ ]]; then
+    # 可能是base64编码，尝试解码
+    decoded=$(echo "$content" | base64 -d 2>/dev/null)
+    if [[ "$decoded" =~ ^vless:// ]] || [[ "$decoded" =~ ^vmess:// ]] || [[ "$decoded" =~ ^trojan:// ]] || [[ "$decoded" =~ ^ss:// ]]; then
+        echo "$decoded" > "$LOCAL_SUB"
+        log "解码并保存了$(echo "$decoded" | wc -l)个节点"
+    else
+        # 尝试解析其他格式
+        echo "$content" | base64 -d > "$LOCAL_SUB" 2>/dev/null || echo "$content" > "$LOCAL_SUB"
+        log "尝试解码并保存了订阅内容"
+    fi
+else
+    # 未知格式，直接保存
+    echo "$content" > "$LOCAL_SUB"
+    log "保存了原始订阅内容"
+fi
+
+log "订阅处理完成"
+EOF
+    
+    # 替换变量
+    for sub in "${subscriptions[@]}"; do
+        if [ -n "$sub" ]; then
+            original_sub="$sub"
+            break
+        fi
+    done
+    
+    # 替换脚本中的变量
+    sed -i "s|__ORIGINAL_SUB__|${original_sub}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    sed -i "s|__LOCAL_SUB__|${SUBCONVERTER_PROXY_SUB}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    sed -i "s|__LOG_FILE__|${SUBCONVERTER_PROXY_LOG}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    
+    # 设置执行权限
+    chmod +x "${SUBCONVERTER_PROXY_SCRIPT}"
+    
+    # 创建nginx配置
+    cat > "${SUBCONVERTER_PROXY_CONFIG}" << EOF
+server {
+    listen ${SUBCONVERTER_PROXY_PORT};
+    
+    location / {
+        root ${SUBCONVERTER_PROXY_DIR};
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+    
+    # 重启nginx
+    systemctl restart nginx
+    
+    # 创建定时刷新任务
+    cat > "${SUBCONVERTER_PROXY_CRON}" << EOF
+*/30 * * * * root ${SUBCONVERTER_PROXY_SCRIPT}
+EOF
+    
+    # 设置权限
+    chmod 644 "${SUBCONVERTER_PROXY_CRON}"
+    
+    # 立即执行一次
+    ${SUBCONVERTER_PROXY_SCRIPT}
+    
+    # 更新原始订阅脚本
+    local proxy_url="http://localhost:${SUBCONVERTER_PROXY_PORT}/$(basename ${SUBCONVERTER_PROXY_SUB})"
+    
+    # 替换订阅源中的第一个链接为代理URL
+    sed -i "0,/\"http/s|\"http[^\"]*\"|\"${proxy_url}\"|" "${SUBCONVERTER_REFRESH_SCRIPT}"
+    
+    # 重启cron服务
+    systemctl restart cron
+}
+
 # 安装Sub-Converter向导
 install_subconverter_wizard() {
     local title="安装Sub-Converter"
@@ -397,6 +518,9 @@ install_subconverter_wizard() {
     
     # 配置订阅刷新
     configure_refresh "$refresh_interval" "$formatted_subscriptions"
+    
+    # 配置订阅代理处理
+    configure_subscription_proxy
     
     # 显示安装信息
     show_installation_info
@@ -1263,6 +1387,182 @@ ${quanx_url}
     fi
 }
 
+# 更新或重新配置订阅代理
+update_subscription_proxy() {
+    local title="更新订阅代理"
+    local message="是否要更新订阅代理配置？这将重新处理所有订阅。"
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+        read -p "是否继续? (y/n): " confirm
+        if [[ ! $confirm =~ ^[Yy]$ ]]; then
+            return
+        fi
+    else
+        dialog --title "$title" --yesno "$message" 8 60
+        local status=$?
+        if [ $status -ne 0 ]; then
+            return
+        fi
+    fi
+    
+    # 检查是否已安装
+    if [ ! -d "${SUBCONVERTER_PROXY_DIR}" ]; then
+        mkdir -p "${SUBCONVERTER_PROXY_DIR}"
+    fi
+    
+    # 获取原始订阅
+    local original_sub=""
+    if [ -f "${SUBCONVERTER_PROXY_DIR}/original_sub_url.txt" ]; then
+        original_sub=$(cat "${SUBCONVERTER_PROXY_DIR}/original_sub_url.txt")
+    else
+        # 如果没有保存原始订阅，提示用户输入
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "请输入原始订阅URL:"
+            read -p "订阅URL: " original_sub
+        else
+            original_sub=$(dialog --title "输入订阅" --inputbox "请输入原始订阅URL:" 8 60 "" 2>&1 >/dev/tty)
+        fi
+    fi
+    
+    if [ -z "$original_sub" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未提供订阅URL"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未提供订阅URL" 6 40
+        fi
+        return
+    fi
+    
+    # 保存原始订阅URL
+    echo "$original_sub" > "${SUBCONVERTER_PROXY_DIR}/original_sub_url.txt"
+    
+    # 重新配置代理处理
+    # 创建代理处理脚本
+    cat > "${SUBCONVERTER_PROXY_SCRIPT}" << 'EOF'
+#!/bin/bash
+
+# 配置变量将在安装时替换
+ORIGINAL_SUB="__ORIGINAL_SUB__"
+LOCAL_SUB="__LOCAL_SUB__"
+LOG_FILE="__LOG_FILE__"
+
+# 记录日志
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+log "开始处理订阅..."
+
+# 下载原始订阅
+content=$(curl -s "$ORIGINAL_SUB")
+if [ -z "$content" ]; then
+    log "错误: 无法获取原始订阅内容"
+    exit 1
+fi
+
+# 检查是否需要做预处理（如base64解码）
+if [[ "$content" =~ ^vless:// ]] || [[ "$content" =~ ^vmess:// ]] || [[ "$content" =~ ^trojan:// ]] || [[ "$content" =~ ^ss:// ]]; then
+    # 已经是协议链接，直接保存
+    echo "$content" > "$LOCAL_SUB"
+    log "保存了$(echo "$content" | wc -l)个节点"
+elif [[ "$content" =~ ^[A-Za-z0-9+/=]+$ ]]; then
+    # 可能是base64编码，尝试解码
+    decoded=$(echo "$content" | base64 -d 2>/dev/null)
+    if [[ "$decoded" =~ ^vless:// ]] || [[ "$decoded" =~ ^vmess:// ]] || [[ "$decoded" =~ ^trojan:// ]] || [[ "$decoded" =~ ^ss:// ]]; then
+        echo "$decoded" > "$LOCAL_SUB"
+        log "解码并保存了$(echo "$decoded" | wc -l)个节点"
+    else
+        # 尝试解析其他格式
+        echo "$content" | base64 -d > "$LOCAL_SUB" 2>/dev/null || echo "$content" > "$LOCAL_SUB"
+        log "尝试解码并保存了订阅内容"
+    fi
+else
+    # 未知格式，直接保存
+    echo "$content" > "$LOCAL_SUB"
+    log "保存了原始订阅内容"
+fi
+
+log "订阅处理完成"
+EOF
+    
+    # 替换脚本中的变量
+    sed -i "s|__ORIGINAL_SUB__|${original_sub}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    sed -i "s|__LOCAL_SUB__|${SUBCONVERTER_PROXY_SUB}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    sed -i "s|__LOG_FILE__|${SUBCONVERTER_PROXY_LOG}|g" "${SUBCONVERTER_PROXY_SCRIPT}"
+    
+    # 设置执行权限
+    chmod +x "${SUBCONVERTER_PROXY_SCRIPT}"
+    
+    # 创建nginx配置
+    cat > "${SUBCONVERTER_PROXY_CONFIG}" << EOF
+server {
+    listen ${SUBCONVERTER_PROXY_PORT};
+    
+    location / {
+        root ${SUBCONVERTER_PROXY_DIR};
+        try_files \$uri \$uri/ =404;
+    }
+}
+EOF
+    
+    # 重启nginx
+    systemctl restart nginx
+    
+    # 创建定时刷新任务
+    cat > "${SUBCONVERTER_PROXY_CRON}" << EOF
+*/30 * * * * root ${SUBCONVERTER_PROXY_SCRIPT}
+EOF
+    
+    # 设置权限
+    chmod 644 "${SUBCONVERTER_PROXY_CRON}"
+    
+    # 立即执行一次
+    ${SUBCONVERTER_PROXY_SCRIPT}
+    
+    # 更新原始订阅脚本
+    local proxy_url="http://localhost:${SUBCONVERTER_PROXY_PORT}/$(basename ${SUBCONVERTER_PROXY_SUB})"
+    
+    # 替换订阅源中的第一个链接为代理URL
+    sed -i "0,/\"http/s|\"http[^\"]*\"|\"${proxy_url}\"|" "${SUBCONVERTER_REFRESH_SCRIPT}"
+    
+    # 重启cron服务
+    systemctl restart cron
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "订阅代理已更新并激活"
+        read -p "按Enter键继续..." confirm
+    else
+        dialog --title "成功" --msgbox "订阅代理已更新并激活" 6 40
+    fi
+}
+
+# 查看代理日志
+view_proxy_logs() {
+    if [ ! -f "${SUBCONVERTER_PROXY_LOG}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "代理日志不存在"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "代理日志不存在" 6 40
+        fi
+        return
+    fi
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        clear
+        cat "${SUBCONVERTER_PROXY_LOG}"
+        echo ""
+        read -p "按Enter键继续..." confirm
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        dialog --title "订阅代理日志" --no-collapse --cr-wrap --tailbox "${SUBCONVERTER_PROXY_LOG}" $dialog_height $dialog_width
+    fi
+}
+
 # 主菜单
 show_subconverter_menu() {
     local title="Sub-Converter 订阅转换管理"
@@ -1275,7 +1575,9 @@ show_subconverter_menu() {
         "6" "立即刷新订阅 - 手动更新所有订阅"
         "7" "生成合并订阅 - 创建便于使用的固定链接"
         "8" "查看服务状态 - 显示运行状态与配置"
-        "9" "卸载 Sub-Converter - 删除所有组件"
+        "9" "更新订阅代理 - 修复解析问题的代理工具"
+        "10" "查看代理日志 - 显示订阅代理处理日志"
+        "11" "卸载 Sub-Converter - 删除所有组件"
         "0" "返回上级菜单"
     )
     
@@ -1295,8 +1597,9 @@ show_subconverter_menu() {
             echo "  1) 安装/配置 Sub-Converter     6) 立即刷新订阅"
             echo "  2) 添加订阅源                 7) 生成合并订阅 ★"
             echo "  3) 删除订阅源                 8) 查看服务状态"
-            echo "  4) 修改访问密码               9) 卸载 Sub-Converter"
-            echo "  5) 修改刷新间隔               "
+            echo "  4) 修改访问密码               9) 更新订阅代理 ★"
+            echo "  5) 修改刷新间隔               10) 查看代理日志"
+            echo "                               11) 卸载 Sub-Converter"
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
@@ -1306,7 +1609,7 @@ show_subconverter_menu() {
                 echo "当前状态: 未安装"
             fi
             echo ""
-            read -p "请选择操作 [0-9]: " choice
+            read -p "请选择操作 [0-11]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
@@ -1321,7 +1624,7 @@ show_subconverter_menu() {
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
                 --extra-button --extra-label "刷新" \
-                --menu "$status_text\n\n请选择一个选项: (★ 推荐使用[7]生成合并订阅)" $dialog_height $dialog_width 10 \
+                --menu "$status_text\n\n请选择一个选项: (★ 表示推荐选项)" $dialog_height $dialog_width 12 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -1357,7 +1660,9 @@ show_subconverter_menu() {
             6) refresh_now ;;
             7) generate_merged_subscription ;;
             8) check_status ;;
-            9) uninstall_subconverter ;;
+            9) update_subscription_proxy ;;
+            10) view_proxy_logs ;;
+            11) uninstall_subconverter ;;
             0) return ;;
             *)
                 if [ "$USE_TEXT_MODE" = true ]; then
