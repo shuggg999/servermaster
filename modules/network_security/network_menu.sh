@@ -19,6 +19,12 @@ fi
 # 保存当前目录
 CURRENT_DIR="$(pwd)"
 
+# 订阅转换器菜单函数
+show_subscription_converter_menu() {
+    # 执行订阅转换器脚本
+    execute_module "network_security/subscription_converter.sh"
+}
+
 # 显示网络安全菜单
 show_network_security_menu() {
     local title="网络与安全"
@@ -31,6 +37,7 @@ show_network_security_menu() {
         "6" "系统监控预警 - TG-bot监控"
         "7" "安全工具 - 漏洞修复与病毒扫描"
         "8" "本机host解析 - 管理hosts文件"
+        "9" "订阅转换管理 - 统一管理多VPS订阅"
         "0" "返回主菜单"
     )
     
@@ -44,21 +51,21 @@ show_network_security_menu() {
             echo "      网络与安全菜单                                   "
             echo "====================================================="
             echo ""
-            echo "  1) 防火墙管理              5) SSH防御程序"
+            echo "  1) 防火墙管理              5) SSH防御程序        9) 订阅转换管理"
             echo "  2) BBR管理                6) 系统监控预警"
             echo "  3) WARP管理               7) 安全工具"
             echo "  4) VPN与代理服务          8) 本机host解析"
             echo ""
             echo "  0) 返回主菜单"
             echo ""
-            read -p "请选择操作 [0-8]: " choice
+            read -p "请选择操作 [0-9]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 9 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 10 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -78,6 +85,7 @@ show_network_security_menu() {
             6) execute_module "network_security/system_monitoring.sh" ;;
             7) execute_module "network_security/security_tools.sh" ;;
             8) execute_module "network_security/hosts_manager.sh" ;;
+            9) show_subscription_converter_menu ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
