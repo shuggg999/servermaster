@@ -11,6 +11,9 @@ if [ -z "$INSTALL_DIR" ]; then
     
     # 导入共享函数
     source "$INSTALL_DIR/main.sh"
+    
+    # 导入对话框规则
+    source "$CONFIG_DIR/dialog_rules.sh"
 fi
 
 # 保存当前目录
@@ -50,9 +53,12 @@ show_network_security_menu() {
             echo ""
             read -p "请选择操作 [0-8]: " choice
         else
+            # 获取对话框尺寸
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 9 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 9 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -120,9 +126,12 @@ show_vpn_proxy_menu() {
             echo ""
             read -p "请选择操作 [0-3]: " choice
         else
+            # 获取对话框尺寸
+            read dialog_height dialog_width <<< $(get_dialog_size)
+            
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" 15 60 4 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 4 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
