@@ -33,6 +33,7 @@ SUBCONVERTER_REFRESH_SCRIPT="${SUBCONVERTER_SCRIPTS_DIR}/refresh_subscriptions.s
 SUBCONVERTER_CRON="/etc/cron.d/subconverter_refresh"
 SUBCONVERTER_LOG="/var/log/subconverter.log"
 SUBCONVERTER_DOCKER_COMPOSE="${SUBCONVERTER_DIR}/docker-compose.yml"
+SUBCONVERTER_MERGED_FILE="${SUBCONVERTER_DIR}/merged_subscriptions.txt"
 
 # 默认设置
 DEFAULT_PORT="25500"
@@ -567,6 +568,18 @@ show_installation_info() {
     # 创建配置文件保存路径
     local config_file="${SUBCONVERTER_DIR}/subscription_info.txt"
     
+    # 构建合并的订阅链接（如果有多个订阅源）
+    local merged_url=""
+    local is_first=true
+    for sub in "${subscriptions[@]}"; do
+        if [ "$is_first" = true ]; then
+            merged_url="${sub}"
+            is_first=false
+        else
+            merged_url="${merged_url}|${sub}"
+        fi
+    done
+    
     local info_text="
 ==================================================
     Sub-Converter 安装完成
@@ -583,7 +596,21 @@ show_installation_info() {
   - IP地址: http://${ip}:${port}
 $([ -n "$domain" ] && echo "  - 域名: http://${domain}:${port}")
 
-订阅地址:
+=============== 合并订阅链接(推荐) ===============
+以下链接可直接使用，无需替换任何内容:
+
+Clash订阅: 
+${access_url}/sub?target=clash&url=${merged_url}&token=${password}
+
+V2ray订阅: 
+${access_url}/sub?target=v2ray&url=${merged_url}&token=${password}
+
+ShadowRocket订阅: 
+${access_url}/sub?target=shadowrocket&url=${merged_url}&token=${password}
+
+=================================================
+
+单个订阅地址(需替换URL):
   - Clash订阅: ${access_url}/sub?target=clash&url=请替换为原始订阅链接&token=${password}
   - V2ray订阅: ${access_url}/sub?target=v2ray&url=请替换为原始订阅链接&token=${password}
   - ShadowRocket订阅: ${access_url}/sub?target=shadowrocket&url=请替换为原始订阅链接&token=${password}
@@ -627,7 +654,27 @@ $([ -n "$domain" ] && echo "服务器域名: ${domain}")
 # 访问地址
 管理地址: ${access_url}
 
-# 订阅链接 (请将YOUR_SUB_URL替换为实际订阅地址)
+# =========== 合并订阅链接(推荐) ===========
+# 以下链接可直接使用，无需替换任何内容
+
+Clash订阅: 
+${access_url}/sub?target=clash&url=${merged_url}&token=${password}
+
+V2ray订阅: 
+${access_url}/sub?target=v2ray&url=${merged_url}&token=${password}
+
+ShadowRocket订阅: 
+${access_url}/sub?target=shadowrocket&url=${merged_url}&token=${password}
+
+Surge订阅: 
+${access_url}/sub?target=surge&url=${merged_url}&token=${password}
+
+QuantumultX订阅: 
+${access_url}/sub?target=quanx&url=${merged_url}&token=${password}
+
+# ========================================
+
+# 单个订阅链接 (请将YOUR_SUB_URL替换为实际订阅地址)
 Clash订阅: ${access_url}/sub?target=clash&url=YOUR_SUB_URL&token=${password}
 V2ray订阅: ${access_url}/sub?target=v2ray&url=YOUR_SUB_URL&token=${password}
 ShadowRocket订阅: ${access_url}/sub?target=shadowrocket&url=YOUR_SUB_URL&token=${password}
@@ -637,8 +684,8 @@ Surge订阅: ${access_url}/sub?target=surge&url=YOUR_SUB_URL&token=${password}
 $(for sub in "${subscriptions[@]}"; do echo "- $sub"; done)
 
 # 使用方法
-# 1. 在客户端中添加上述订阅链接
-# 2. 将YOUR_SUB_URL替换为您的实际订阅地址
+# 1. 推荐使用"合并订阅链接"，无需替换任何内容
+# 2. 如需指定单个订阅，将YOUR_SUB_URL替换为实际订阅地址
 EOF
 
     # 设置文件权限
@@ -960,10 +1007,29 @@ Sub-Converter 服务状态:
 
 示例订阅链接:
 - Clash: http://${ip}:${port}/sub?target=clash&url=YOUR_SUB_URL&token=${password}
-- V2ray: http://${ip}:${port}/sub?target=v2ray&url=YOUR_SUB_URL&token=${password}
-- ShadowRocket: http://${ip}:${port}/sub?target=shadowrocket&url=YOUR_SUB_URL&token=${password}
+- V2ray: http://${ip}:${port}/sub?target=v2ray&url=请替换为原始订阅链接&token=${password}
+- ShadowRocket订阅: http://${ip}:${port}/sub?target=shadowrocket&url=请替换为原始订阅链接&token=${password}
+- Surge订阅: http://${ip}:${port}/sub?target=surge&url=请替换为原始订阅链接&token=${password}
 
-订阅信息文件: ${config_file}
+更新频率:
+  - 刷新间隔: ${refresh_interval}
+
+管理:
+$([ "$install_method" = "direct" ] && echo "  - 启动: systemctl start subconverter
+  - 停止: systemctl stop subconverter
+  - 重启: systemctl restart subconverter
+  - 状态: systemctl status subconverter" || echo "  - 启动: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} up -d
+  - 停止: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} down
+  - 重启: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} restart
+  - 状态: docker ps | grep subconverter")
+  - 日志: ${SUBCONVERTER_LOG}
+
+配置文件:
+$([ "$install_method" = "direct" ] && echo "  - 主配置: ${SUBCONVERTER_CONFIG}" || echo "  - 主配置: ${SUBCONVERTER_DIR}/config/pref.toml")
+  - 刷新脚本: ${SUBCONVERTER_REFRESH_SCRIPT}
+  - 密码文件: ${SUBCONVERTER_ACCESS_FILE}
+
+订阅信息已保存到文件: ${config_file}
 "
     
     if [ "$USE_TEXT_MODE" = true ]; then
@@ -1044,6 +1110,159 @@ uninstall_subconverter() {
     fi
 }
 
+# 生成合并订阅链接
+generate_merged_subscription() {
+    local title="生成合并订阅"
+    local message="正在生成合并订阅链接..."
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+    else
+        show_progress_dialog "$title" "$message"
+    fi
+    
+    # 检查是否已安装
+    if [ ! -f "${SUBCONVERTER_REFRESH_SCRIPT}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 请先安装Sub-Converter"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "请先安装Sub-Converter" 6 40
+        fi
+        return
+    fi
+    
+    # 提取已添加的订阅源
+    local subscriptions=$(grep -oP '(?<=")https?://[^"]*(?=")' "${SUBCONVERTER_REFRESH_SCRIPT}")
+    
+    if [ -z "$subscriptions" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到订阅源，请先添加订阅源"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到订阅源，请先添加订阅源" 6 50
+        fi
+        return
+    fi
+    
+    # 读取配置信息
+    local ip=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me)
+    local port=$(grep -oP '(?<=port = )\d+' "${SUBCONVERTER_CONFIG}" 2>/dev/null || grep -o '[0-9]\+:25500' "${SUBCONVERTER_DOCKER_COMPOSE}" 2>/dev/null | cut -d':' -f1)
+    local password=$(cat "${SUBCONVERTER_ACCESS_FILE}")
+    local domain=""
+    
+    # 检查是否设置了域名
+    if [ -f "/etc/nginx/conf.d/subconverter.conf" ]; then
+        domain=$(grep -oP '(?<=server_name )[^;]+' "/etc/nginx/conf.d/subconverter.conf" | tr -d '[:space:]')
+    fi
+    
+    # 确定访问URL
+    local access_url=""
+    if [ -n "$domain" ]; then
+        access_url="http://${domain}:${port}"
+    else
+        access_url="http://${ip}:${port}"
+    fi
+    
+    # 构建合并的订阅链接（使用|分隔多个URL）
+    local merged_url=""
+    local is_first=true
+    while IFS= read -r sub; do
+        if [ "$is_first" = true ]; then
+            merged_url="${sub}"
+            is_first=false
+        else
+            merged_url="${merged_url}|${sub}"
+        fi
+    done <<< "$subscriptions"
+    
+    # 生成各客户端的最终订阅链接
+    local clash_url="${access_url}/sub?target=clash&url=${merged_url}&token=${password}"
+    local v2ray_url="${access_url}/sub?target=v2ray&url=${merged_url}&token=${password}"
+    local shadowrocket_url="${access_url}/sub?target=shadowrocket&url=${merged_url}&token=${password}"
+    local surge_url="${access_url}/sub?target=surge&url=${merged_url}&token=${password}"
+    local quanx_url="${access_url}/sub?target=quanx&url=${merged_url}&token=${password}"
+    
+    # 保存到文件
+    cat > "${SUBCONVERTER_MERGED_FILE}" << EOF
+# Sub-Converter 合并订阅链接
+# 生成时间: $(date "+%Y-%m-%d %H:%M:%S")
+# 所有客户端只需使用以下链接，无需替换任何内容
+
+# Clash订阅
+${clash_url}
+
+# V2ray客户端订阅
+${v2ray_url}
+
+# ShadowRocket订阅
+${shadowrocket_url}
+
+# Surge订阅
+${surge_url}
+
+# QuantumultX订阅
+${quanx_url}
+
+# 包含的原始订阅源:
+$(while IFS= read -r sub; do echo "- $sub"; done <<< "$subscriptions")
+
+# 使用方法:
+# 1. 复制上述对应您设备的链接
+# 2. 在客户端中直接添加，无需修改
+EOF
+    
+    # 设置文件权限
+    chmod 644 "${SUBCONVERTER_MERGED_FILE}"
+    
+    # 显示成功信息
+    local success_message="合并订阅链接已生成并保存到文件:
+${SUBCONVERTER_MERGED_FILE}
+
+以下是您可以直接使用的订阅链接:
+
+Clash订阅:
+${clash_url}
+
+V2ray订阅:
+${v2ray_url}
+
+ShadowRocket订阅:
+${shadowrocket_url}
+
+Surge订阅:
+${surge_url}
+
+QuantumultX订阅:
+${quanx_url}
+
+您可以在任何客户端中直接使用这些链接，无需替换任何内容。"
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        clear
+        echo "$success_message"
+        echo ""
+        read -p "按Enter键继续..." confirm
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        dialog --title "合并订阅生成成功" --yes-label "查看完整链接" --no-label "关闭" --yesno "$success_message" $dialog_height $dialog_width
+        
+        local choice=$?
+        if [ $choice -eq 0 ]; then
+            # 用户选择查看文件
+            if command -v nano >/dev/null 2>&1; then
+                nano "${SUBCONVERTER_MERGED_FILE}"
+            elif command -v vi >/dev/null 2>&1; then
+                vi "${SUBCONVERTER_MERGED_FILE}"
+            else
+                less "${SUBCONVERTER_MERGED_FILE}"
+            fi
+        fi
+    fi
+}
+
 # 主菜单
 show_subconverter_menu() {
     local title="Sub-Converter 订阅转换管理"
@@ -1054,8 +1273,9 @@ show_subconverter_menu() {
         "4" "修改访问密码 - 更改访问验证密码"
         "5" "修改刷新间隔 - 更改订阅更新频率"
         "6" "立即刷新订阅 - 手动更新所有订阅"
-        "7" "查看服务状态 - 显示运行状态与配置"
-        "8" "卸载 Sub-Converter - 删除所有组件"
+        "7" "生成合并订阅 - 创建便于使用的固定链接"
+        "8" "查看服务状态 - 显示运行状态与配置"
+        "9" "卸载 Sub-Converter - 删除所有组件"
         "0" "返回上级菜单"
     )
     
@@ -1072,10 +1292,11 @@ show_subconverter_menu() {
             echo "      Sub-Converter 订阅转换管理                     "
             echo "====================================================="
             echo ""
-            echo "  1) 安装/配置 Sub-Converter     5) 修改刷新间隔"
-            echo "  2) 添加订阅源                 6) 立即刷新订阅"
-            echo "  3) 删除订阅源                 7) 查看服务状态"
-            echo "  4) 修改访问密码               8) 卸载 Sub-Converter"
+            echo "  1) 安装/配置 Sub-Converter     6) 立即刷新订阅"
+            echo "  2) 添加订阅源                 7) 生成合并订阅 ★"
+            echo "  3) 删除订阅源                 8) 查看服务状态"
+            echo "  4) 修改访问密码               9) 卸载 Sub-Converter"
+            echo "  5) 修改刷新间隔               "
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
@@ -1085,7 +1306,7 @@ show_subconverter_menu() {
                 echo "当前状态: 未安装"
             fi
             echo ""
-            read -p "请选择操作 [0-8]: " choice
+            read -p "请选择操作 [0-9]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
@@ -1100,7 +1321,7 @@ show_subconverter_menu() {
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
                 --extra-button --extra-label "刷新" \
-                --menu "$status_text\n\n请选择一个选项:" $dialog_height $dialog_width 9 \
+                --menu "$status_text\n\n请选择一个选项: (★ 推荐使用[7]生成合并订阅)" $dialog_height $dialog_width 10 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -1134,8 +1355,9 @@ show_subconverter_menu() {
             4) change_password ;;
             5) change_refresh_interval ;;
             6) refresh_now ;;
-            7) check_status ;;
-            8) uninstall_subconverter ;;
+            7) generate_merged_subscription ;;
+            8) check_status ;;
+            9) uninstall_subconverter ;;
             0) return ;;
             *)
                 if [ "$USE_TEXT_MODE" = true ]; then
