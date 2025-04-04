@@ -151,15 +151,35 @@ EOF
 
 # 获取用户输入的域名
 get_domain() {
-    local input_result=$(show_input_dialog "域名配置" "请输入您的域名 (用于客户端连接):" "reality.example.com")
-    local domain=$(echo $input_result | cut -d'|' -f1)
-    local status=$(echo $input_result | cut -d'|' -f2)
-    
-    if [[ $status -ne 0 || -z "$domain" ]]; then
-        warning "未提供域名，使用默认值: reality.example.com"
-        echo "reality.example.com"
+    if [ "$USE_TEXT_MODE" = true ]; then
+        # 文本模式下的域名输入
+        while true; do
+            echo ""
+            echo "请输入您的域名 (用于客户端连接):"
+            echo "提示：如果没有域名，可以直接输入VPS的IP地址"
+            read -p "域名或IP地址: " domain
+            
+            if [ -n "$domain" ]; then
+                echo "$domain"
+                return
+            else
+                echo "域名不能为空，请重新输入"
+            fi
+        done
     else
-        echo "$domain"
+        # Dialog模式下的域名输入
+        local input_result=$(dialog --clear --title "域名配置" \
+            --inputbox "请输入您的域名或VPS的IP地址 (用于客户端连接):\n\n提示：如果没有域名，可以直接输入VPS的IP地址" \
+            12 50 "reality.example.com" 2>&1 >/dev/tty)
+        
+        local status=$?
+        if [ $status -ne 0 ] || [ -z "$input_result" ]; then
+            # 如果用户取消或输入为空，切换到文本模式重试
+            export USE_TEXT_MODE=true
+            get_domain
+        else
+            echo "$input_result"
+        fi
     fi
 }
 
@@ -455,11 +475,26 @@ main() {
     echo "  5. 生成客户端订阅地址"
     echo ""
     
+    # 检测是否支持dialog
+    if ! command -v dialog &> /dev/null; then
+        export USE_TEXT_MODE=true
+        warning "未检测到dialog程序，将使用文本模式进行安装"
+    fi
+    
     # 确认安装
-    local confirm=$(show_confirm_dialog "安装确认" "是否开始安装Xray Reality VPN服务?")
-    if [[ $confirm -ne 0 ]]; then
-        info "用户取消安装"
-        exit 0
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "是否开始安装Xray Reality VPN服务? (y/n)"
+        read -p "请输入 (y/n): " confirm
+        if [[ ! $confirm =~ ^[Yy]$ ]]; then
+            info "用户取消安装"
+            exit 0
+        fi
+    else
+        local confirm=$(show_confirm_dialog "安装确认" "是否开始安装Xray Reality VPN服务?")
+        if [[ $confirm -ne 0 ]]; then
+            info "用户取消安装"
+            exit 0
+        fi
     fi
     
     # 获取域名
