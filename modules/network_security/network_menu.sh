@@ -37,7 +37,6 @@ show_network_security_menu() {
         "6" "系统监控预警 - TG-bot监控"
         "7" "安全工具 - 漏洞修复与病毒扫描"
         "8" "本机host解析 - 管理hosts文件"
-        "9" "订阅转换管理 - 统一管理多VPS订阅"
         "0" "返回主菜单"
     )
     
@@ -51,21 +50,21 @@ show_network_security_menu() {
             echo "      网络与安全菜单                                   "
             echo "====================================================="
             echo ""
-            echo "  1) 防火墙管理              5) SSH防御程序        9) 订阅转换管理"
+            echo "  1) 防火墙管理              5) SSH防御程序"
             echo "  2) BBR管理                6) 系统监控预警"
             echo "  3) WARP管理               7) 安全工具"
             echo "  4) VPN与代理服务          8) 本机host解析"
             echo ""
             echo "  0) 返回主菜单"
             echo ""
-            read -p "请选择操作 [0-9]: " choice
+            read -p "请选择操作 [0-8]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 10 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 9 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -85,7 +84,6 @@ show_network_security_menu() {
             6) execute_module "network_security/system_monitoring.sh" ;;
             7) execute_module "network_security/security_tools.sh" ;;
             8) execute_module "network_security/hosts_manager.sh" ;;
-            9) show_subscription_converter_menu ;;
             0) 
                 cd "$CURRENT_DIR"  # 恢复原始目录
                 return 
@@ -116,6 +114,7 @@ show_vpn_proxy_menu() {
         "1" "Xray Reality VPN一键安装 - 自动配置订阅更新"
         "2" "Xray手动更新 - 更新现有Xray配置"
         "3" "其他代理工具 - 更多代理选项"
+        "4" "订阅转换管理 - 统一管理多VPS订阅"
         "0" "返回上级菜单"
     )
     
@@ -129,17 +128,18 @@ show_vpn_proxy_menu() {
             echo "  1) Xray Reality VPN一键安装"
             echo "  2) Xray手动更新"
             echo "  3) 其他代理工具"
+            echo "  4) 订阅转换管理"
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
-            read -p "请选择操作 [0-3]: " choice
+            read -p "请选择操作 [0-4]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
             # 使用Dialog显示菜单
             choice=$(dialog --clear --title "$title" \
-                --menu "请选择一个选项:" $dialog_height $dialog_width 4 \
+                --menu "请选择一个选项:" $dialog_height $dialog_width 5 \
                 "${menu_items[@]}" 2>&1 >/dev/tty)
             
             # 检查是否按下ESC或Cancel
@@ -153,6 +153,7 @@ show_vpn_proxy_menu() {
             1) execute_module "network_security/xray_setup.sh" ;;
             2) execute_module "network_security/xray_update.sh" ;;
             3) execute_module "network_security/other_proxy_tools.sh" ;;
+            4) show_subscription_converter_menu ;;
             0) return ;;
             *) 
                 if [ "$USE_TEXT_MODE" = true ]; then

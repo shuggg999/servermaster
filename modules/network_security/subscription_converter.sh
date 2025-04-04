@@ -32,6 +32,7 @@ SUBCONVERTER_SCRIPTS_DIR="${SUBCONVERTER_DIR}/scripts"
 SUBCONVERTER_REFRESH_SCRIPT="${SUBCONVERTER_SCRIPTS_DIR}/refresh_subscriptions.sh"
 SUBCONVERTER_CRON="/etc/cron.d/subconverter_refresh"
 SUBCONVERTER_LOG="/var/log/subconverter.log"
+SUBCONVERTER_DOCKER_COMPOSE="${SUBCONVERTER_DIR}/docker-compose.yml"
 
 # 默认设置
 DEFAULT_PORT="25500"
@@ -62,19 +63,33 @@ install_dependencies() {
         # Debian/Ubuntu系统
         apt update -y
         apt install -y curl wget tar unzip git nginx cron jq
+        
+        # 如果是Docker安装方式，安装Docker
+        if [ "$install_method" = "docker" ]; then
+            apt install -y docker.io docker-compose
+            systemctl enable docker
+            systemctl start docker
+        fi
     elif [ -f /etc/redhat-release ]; then
         # CentOS/RHEL系统
         yum install -y curl wget tar unzip git nginx cronie jq
+        
+        # 如果是Docker安装方式，安装Docker
+        if [ "$install_method" = "docker" ]; then
+            yum install -y docker-ce docker-compose-plugin
+            systemctl enable docker
+            systemctl start docker
+        fi
     else
         show_error_dialog "系统错误" "不支持的操作系统类型"
         exit 1
     fi
 }
 
-# 安装 Sub-Converter
-install_subconverter() {
+# 安装 Sub-Converter (直接安装方式)
+install_subconverter_direct() {
     local title="安装Sub-Converter"
-    local message="正在安装Sub-Converter..."
+    local message="正在通过直接下载方式安装Sub-Converter..."
     
     if [ "$USE_TEXT_MODE" = true ]; then
         echo "$message"
@@ -96,7 +111,14 @@ install_subconverter() {
         LATEST_RELEASE_URL="https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.tar.gz"
     fi
     
-    wget -O subconverter.tar.gz "${LATEST_RELEASE_URL}"
+    # 使用国内镜像下载（如果可用）
+    MIRROR_URL="https://mirror.ghproxy.com/$LATEST_RELEASE_URL"
+    if wget -T 10 -t 3 -q --spider "$MIRROR_URL"; then
+        wget -O subconverter.tar.gz "$MIRROR_URL" || wget -O subconverter.tar.gz "${LATEST_RELEASE_URL}"
+    else
+        wget -O subconverter.tar.gz "${LATEST_RELEASE_URL}"
+    fi
+    
     tar -xzf subconverter.tar.gz -C "${SUBCONVERTER_DIR}" --strip-components=1
     rm subconverter.tar.gz
     
@@ -105,6 +127,64 @@ install_subconverter() {
     
     # 备份原始配置
     cp "${SUBCONVERTER_CONFIG}" "${SUBCONVERTER_BACKUP_DIR}/pref.toml.original"
+}
+
+# 安装 Sub-Converter (Docker方式)
+install_subconverter_docker() {
+    local title="安装Sub-Converter"
+    local message="正在通过Docker方式安装Sub-Converter..."
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+    else
+        show_progress_dialog "$title" "$message"
+    fi
+    
+    # 创建安装目录
+    mkdir -p "${SUBCONVERTER_DIR}"
+    mkdir -p "${SUBCONVERTER_BACKUP_DIR}"
+    mkdir -p "${SUBCONVERTER_SCRIPTS_DIR}"
+    mkdir -p "${SUBCONVERTER_DIR}/config"
+    
+    # 创建Docker Compose配置
+    cat > "${SUBCONVERTER_DOCKER_COMPOSE}" <<EOF
+version: '3'
+services:
+  subconverter:
+    image: tindy2013/subconverter:latest
+    container_name: subconverter
+    restart: always
+    ports:
+      - "${port}:25500"
+    volumes:
+      - ${SUBCONVERTER_DIR}/config:/base/config
+    networks:
+      - subconverter_net
+
+networks:
+  subconverter_net:
+    driver: bridge
+EOF
+    
+    # 启动Docker容器
+    docker-compose -f "${SUBCONVERTER_DOCKER_COMPOSE}" up -d
+    
+    # 等待容器启动并获取配置文件
+    sleep 5
+    
+    # 复制配置文件
+    if [ ! -f "${SUBCONVERTER_DIR}/config/pref.toml" ]; then
+        docker cp subconverter:/base/pref.toml "${SUBCONVERTER_DIR}/config/pref.toml"
+    fi
+    
+    # 备份原始配置
+    cp "${SUBCONVERTER_DIR}/config/pref.toml" "${SUBCONVERTER_BACKUP_DIR}/pref.toml.original"
+    
+    # 设置权限
+    chmod -R 755 "${SUBCONVERTER_DIR}/config"
+    
+    # 更新配置文件路径
+    SUBCONVERTER_CONFIG="${SUBCONVERTER_DIR}/config/pref.toml"
 }
 
 # 配置 Sub-Converter
@@ -121,17 +201,20 @@ configure_subconverter() {
         show_progress_dialog "$title" "$message"
     fi
     
-    # 更新端口配置
-    sed -i "s/^port = .*/port = ${port}/" "${SUBCONVERTER_CONFIG}"
+    # 更新端口配置 (仅在直接安装时需要)
+    if [ "$install_method" = "direct" ]; then
+        sed -i "s/^port = .*/port = ${port}/" "${SUBCONVERTER_CONFIG}"
+    fi
     
     # 配置访问令牌
     echo "${password}" > "${SUBCONVERTER_ACCESS_FILE}"
     
-    # 启用访问令牌
+    # 配置访问令牌
     sed -i 's/^api_access_token = ""/api_access_token = "true"/' "${SUBCONVERTER_CONFIG}"
     
-    # 配置服务
-    cat > "${SUBCONVERTER_SERVICE}" <<EOF
+    if [ "$install_method" = "direct" ]; then
+        # 配置服务
+        cat > "${SUBCONVERTER_SERVICE}" <<EOF
 [Unit]
 Description=Subscription Converter Service
 After=network.target
@@ -147,11 +230,15 @@ User=root
 [Install]
 WantedBy=multi-user.target
 EOF
-    
-    # 设置服务自启动
-    systemctl daemon-reload
-    systemctl enable subconverter
-    systemctl restart subconverter
+        
+        # 设置服务自启动
+        systemctl daemon-reload
+        systemctl enable subconverter
+        systemctl restart subconverter
+    else
+        # Docker方式不需要systemd服务
+        docker-compose -f "${SUBCONVERTER_DOCKER_COMPOSE}" restart
+    fi
 }
 
 # 配置定时刷新
@@ -265,7 +352,7 @@ install_subconverter_wizard() {
     local title="安装Sub-Converter"
     
     # 检查是否已安装
-    if [ -d "${SUBCONVERTER_DIR}" ] && [ -f "${SUBCONVERTER_DIR}/subconverter" ]; then
+    if [ -d "${SUBCONVERTER_DIR}" ] && ([ -f "${SUBCONVERTER_DIR}/subconverter" ] || [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]); then
         local confirm_message="检测到已安装Sub-Converter，是否重新安装？"
         
         if [ "$USE_TEXT_MODE" = true ]; then
@@ -282,13 +369,24 @@ install_subconverter_wizard() {
         fi
     fi
     
+    # 选择安装方式
+    select_installation_method
+    
     # 获取配置参数
     get_installation_params
     
     # 安装流程
     check_root
     install_dependencies
-    install_subconverter
+    
+    # 根据选择的安装方式执行不同的安装函数
+    if [ "$install_method" = "direct" ]; then
+        install_subconverter_direct
+    else
+        install_subconverter_docker
+    fi
+    
+    # 配置 Sub-Converter
     configure_subconverter "$port" "$password"
     
     # 配置域名 (如果提供)
@@ -303,6 +401,38 @@ install_subconverter_wizard() {
     show_installation_info
 }
 
+# 选择安装方式
+select_installation_method() {
+    local title="选择安装方式"
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "请选择Sub-Converter的安装方式:"
+        echo "1) 直接安装 (传统方式)"
+        echo "2) Docker安装 (推荐，避免网络问题)"
+        read -p "请选择 [1-2]: " method_choice
+        
+        case $method_choice in
+            1) install_method="direct" ;;
+            2) install_method="docker" ;;
+            *) install_method="docker" ;; # 默认选择Docker
+        esac
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        # 显示选择对话框
+        method_options=(
+            "direct" "直接安装 (传统方式)"
+            "docker" "Docker安装 (推荐，避免网络问题)"
+        )
+        
+        install_method=$(dialog --title "$title" --menu "请选择Sub-Converter的安装方式:" $dialog_height $dialog_width 2 "${method_options[@]}" 2>&1 >/dev/tty)
+        if [ -z "$install_method" ]; then
+            install_method="docker"  # 默认选择Docker
+        fi
+    fi
+}
+
 # 获取安装参数
 get_installation_params() {
     # 端口设置
@@ -315,8 +445,8 @@ get_installation_params() {
         read -p "密码: " input_password
         password=${input_password:-$DEFAULT_PASSWORD}
         
-        echo "请输入域名 (如果有):"
-        read -p "域名 (留空则不配置): " domain
+        echo "请输入主机域名 (用于访问Sub-Converter服务):"
+        read -p "主机域名 (留空则使用IP地址): " domain
         
         echo "请设置订阅刷新间隔:"
         echo "1) 30分钟"
@@ -339,7 +469,7 @@ get_installation_params() {
         
         echo "请输入需要管理的订阅链接 (每行一个):"
         echo "示例: https://example.com/subscription1"
-        echo "     https://example.com/subscription2"
+        echo "     vless://... (Base64编码的VPS节点链接)"
         echo "输入完成后，请输入空行并按Enter结束输入"
         
         subscriptions=()
@@ -366,8 +496,8 @@ get_installation_params() {
             password="${DEFAULT_PASSWORD}"
         fi
         
-        # 域名设置
-        domain=$(dialog --title "域名设置" --inputbox "请输入域名 (如果有):\n留空则不配置" 10 50 "" 2>&1 >/dev/tty)
+        # 主机域名设置
+        domain=$(dialog --title "主机域名设置" --inputbox "请输入主机域名 (用于访问Sub-Converter服务):\n留空则使用IP地址" 10 70 "" 2>&1 >/dev/tty)
         
         # 刷新间隔设置
         refresh_options=(
@@ -385,10 +515,27 @@ get_installation_params() {
         fi
         
         # 订阅链接设置
+        dialog --title "订阅链接" --msgbox "请输入需要管理的订阅链接 (每行一个):\n\n示例: https://example.com/subscription1\n      vless://... (Base64编码的VPS节点链接)\n\n在下一个编辑框中输入这些链接。" 12 70
+        
+        # 创建临时文件并设置默认内容
+        cat > /tmp/sub_links.tmp << EOF
+# 在此输入您的订阅链接，每行一个
+# 示例:
+# https://example.com/subscription1
+# vless://XXXXXXX...
+EOF
+        
+        # 订阅链接设置
         subscriptions_text=$(dialog --title "订阅链接" --editbox /tmp/sub_links.tmp 20 70 2>&1 >/dev/tty)
         
-        # 将文本转换为数组
-        IFS=$'\n' read -d '' -ra subscriptions <<< "$subscriptions_text"
+        # 将文本转换为数组，并过滤掉注释行
+        subscriptions=()
+        while IFS= read -r line; do
+            # 跳过空行和注释行
+            if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+                subscriptions+=("$line")
+            fi
+        done <<< "$subscriptions_text"
     fi
     
     # 格式化订阅链接
@@ -403,44 +550,99 @@ get_installation_params() {
 # 显示安装信息
 show_installation_info() {
     local ip=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me)
+    local installation_type="直接安装"
+    local access_url=""
+    
+    if [ "$install_method" = "docker" ]; then
+        installation_type="Docker安装"
+    fi
+    
+    # 确定访问URL
+    if [ -n "$domain" ]; then
+        access_url="http://${domain}:${port}"
+    else
+        access_url="http://${ip}:${port}"
+    fi
+    
+    # 创建配置文件保存路径
+    local config_file="${SUBCONVERTER_DIR}/subscription_info.txt"
     
     local info_text="
 ==================================================
     Sub-Converter 安装完成
 ==================================================
 
+安装类型: ${installation_type}
+
 服务信息:
-  - 状态: $(systemctl is-active subconverter)
+  - 状态: $([ "$install_method" = "direct" ] && systemctl is-active subconverter || docker ps | grep -q subconverter && echo "running" || echo "stopped")
   - 端口: ${port}
   - 访问密码: ${password}
 
 访问信息:
   - IP地址: http://${ip}:${port}
-$([ -n "$domain" ] && echo "  - 域名: http://${domain}")
+$([ -n "$domain" ] && echo "  - 域名: http://${domain}:${port}")
 
 订阅地址:
-  - Clash订阅: http://${ip}:${port}/sub?target=clash&url=请替换为原始订阅链接&token=${password}
-  - V2ray订阅: http://${ip}:${port}/sub?target=v2ray&url=请替换为原始订阅链接&token=${password}
-  - ShadowRocket订阅: http://${ip}:${port}/sub?target=shadowrocket&url=请替换为原始订阅链接&token=${password}
-  - Surge订阅: http://${ip}:${port}/sub?target=surge&url=请替换为原始订阅链接&token=${password}
+  - Clash订阅: ${access_url}/sub?target=clash&url=请替换为原始订阅链接&token=${password}
+  - V2ray订阅: ${access_url}/sub?target=v2ray&url=请替换为原始订阅链接&token=${password}
+  - ShadowRocket订阅: ${access_url}/sub?target=shadowrocket&url=请替换为原始订阅链接&token=${password}
+  - Surge订阅: ${access_url}/sub?target=surge&url=请替换为原始订阅链接&token=${password}
 
 更新频率:
   - 刷新间隔: ${refresh_interval}
 
 管理:
-  - 启动: systemctl start subconverter
+$([ "$install_method" = "direct" ] && echo "  - 启动: systemctl start subconverter
   - 停止: systemctl stop subconverter
   - 重启: systemctl restart subconverter
-  - 状态: systemctl status subconverter
+  - 状态: systemctl status subconverter" || echo "  - 启动: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} up -d
+  - 停止: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} down
+  - 重启: docker-compose -f ${SUBCONVERTER_DOCKER_COMPOSE} restart
+  - 状态: docker ps | grep subconverter")
   - 日志: ${SUBCONVERTER_LOG}
 
 配置文件:
-  - 主配置: ${SUBCONVERTER_CONFIG}
+$([ "$install_method" = "direct" ] && echo "  - 主配置: ${SUBCONVERTER_CONFIG}" || echo "  - 主配置: ${SUBCONVERTER_DIR}/config/pref.toml")
   - 刷新脚本: ${SUBCONVERTER_REFRESH_SCRIPT}
   - 密码文件: ${SUBCONVERTER_ACCESS_FILE}
-  
+
+订阅信息已保存到文件: ${config_file}
+您可以使用文本编辑器打开此文件复制订阅链接
+
 ==================================================
 "
+    
+    # 保存配置信息到文件，方便用户复制
+    cat > "${config_file}" << EOF
+# Sub-Converter 订阅信息
+# 安装时间: $(date "+%Y-%m-%d %H:%M:%S")
+
+# 服务器信息
+服务器IP: ${ip}
+$([ -n "$domain" ] && echo "服务器域名: ${domain}")
+服务端口: ${port}
+访问密码: ${password}
+
+# 访问地址
+管理地址: ${access_url}
+
+# 订阅链接 (请将YOUR_SUB_URL替换为实际订阅地址)
+Clash订阅: ${access_url}/sub?target=clash&url=YOUR_SUB_URL&token=${password}
+V2ray订阅: ${access_url}/sub?target=v2ray&url=YOUR_SUB_URL&token=${password}
+ShadowRocket订阅: ${access_url}/sub?target=shadowrocket&url=YOUR_SUB_URL&token=${password}
+Surge订阅: ${access_url}/sub?target=surge&url=YOUR_SUB_URL&token=${password}
+
+# 已添加的订阅源
+$(for sub in "${subscriptions[@]}"; do echo "- $sub"; done)
+
+# 使用方法
+# 1. 在客户端中添加上述订阅链接
+# 2. 将YOUR_SUB_URL替换为您的实际订阅地址
+EOF
+
+    # 设置文件权限
+    chmod 644 "${config_file}"
     
     if [ "$USE_TEXT_MODE" = true ]; then
         clear
@@ -450,7 +652,20 @@ $([ -n "$domain" ] && echo "  - 域名: http://${domain}")
     else
         # 获取对话框尺寸
         read dialog_height dialog_width <<< $(get_dialog_size)
-        dialog --title "安装完成" --msgbox "$info_text" $dialog_height $dialog_width
+        
+        dialog --title "安装完成" --yes-label "查看配置文件" --no-label "关闭" --yesno "$info_text" $dialog_height $dialog_width
+        
+        local choice=$?
+        if [ $choice -eq 0 ]; then
+            # 用户选择查看配置文件
+            if command -v nano >/dev/null 2>&1; then
+                nano "${config_file}"
+            elif command -v vi >/dev/null 2>&1; then
+                vi "${config_file}"
+            else
+                less "${config_file}"
+            fi
+        fi
     fi
 }
 
@@ -700,14 +915,34 @@ refresh_now() {
 
 # 查看服务状态
 check_status() {
-    local service_status=$(systemctl is-active subconverter)
-    local service_enabled=$(systemctl is-enabled subconverter)
-    local port=$(grep -oP '(?<=port = )\d+' "${SUBCONVERTER_CONFIG}")
+    local is_docker=false
+    if [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]; then
+        is_docker=true
+    fi
+    
+    if [ "$is_docker" = true ]; then
+        local service_status=$(docker ps | grep -q subconverter && echo "running" || echo "stopped")
+        local service_enabled="已启用"
+    else
+        local service_status=$(systemctl is-active subconverter)
+        local service_enabled=$(systemctl is-enabled subconverter)
+    fi
+    
+    local port=""
+    if [ "$is_docker" = true ]; then
+        port=$(grep -o "${port}:25500" "${SUBCONVERTER_DOCKER_COMPOSE}" | cut -d':' -f1)
+    else
+        port=$(grep -oP '(?<=port = )\d+' "${SUBCONVERTER_CONFIG}")
+    fi
+    
     local password=$(cat "${SUBCONVERTER_ACCESS_FILE}")
     local cron_schedule=$(grep "${SUBCONVERTER_REFRESH_SCRIPT}" "${SUBCONVERTER_CRON}" | awk '{print $1, $2, $3, $4, $5}')
     local ip=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me)
     
     local subscription_count=$(grep -c "https://" "${SUBCONVERTER_REFRESH_SCRIPT}")
+    
+    # 获取配置文件路径
+    local config_file="${SUBCONVERTER_DIR}/subscription_info.txt"
     
     local info_text="
 Sub-Converter 服务状态:
@@ -727,6 +962,8 @@ Sub-Converter 服务状态:
 - Clash: http://${ip}:${port}/sub?target=clash&url=YOUR_SUB_URL&token=${password}
 - V2ray: http://${ip}:${port}/sub?target=v2ray&url=YOUR_SUB_URL&token=${password}
 - ShadowRocket: http://${ip}:${port}/sub?target=shadowrocket&url=YOUR_SUB_URL&token=${password}
+
+订阅信息文件: ${config_file}
 "
     
     if [ "$USE_TEXT_MODE" = true ]; then
@@ -737,7 +974,20 @@ Sub-Converter 服务状态:
     else
         # 获取对话框尺寸
         read dialog_height dialog_width <<< $(get_dialog_size)
-        dialog --title "服务状态" --msgbox "$info_text" $dialog_height $dialog_width
+        
+        dialog --title "服务状态" --yes-label "查看配置文件" --no-label "关闭" --yesno "$info_text" $dialog_height $dialog_width
+        
+        local choice=$?
+        if [ $choice -eq 0 ] && [ -f "${config_file}" ]; then
+            # 用户选择查看配置文件
+            if command -v nano >/dev/null 2>&1; then
+                nano "${config_file}"
+            elif command -v vi >/dev/null 2>&1; then
+                vi "${config_file}"
+            else
+                less "${config_file}"
+            fi
+        fi
     fi
 }
 
@@ -761,9 +1011,20 @@ uninstall_subconverter() {
         fi
     fi
     
-    # 停止服务
-    systemctl stop subconverter
-    systemctl disable subconverter
+    # 检查安装方式
+    local is_docker=false
+    if [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]; then
+        is_docker=true
+    fi
+    
+    if [ "$is_docker" = true ]; then
+        # Docker方式卸载
+        docker-compose -f "${SUBCONVERTER_DOCKER_COMPOSE}" down
+    else
+        # 直接安装方式卸载
+        systemctl stop subconverter
+        systemctl disable subconverter
+    fi
     
     # 删除文件
     rm -rf "${SUBCONVERTER_DIR}"
@@ -801,7 +1062,7 @@ show_subconverter_menu() {
     while true; do
         # 检查服务状态
         local installed=false
-        if [ -f "${SUBCONVERTER_DIR}/subconverter" ]; then
+        if [ -f "${SUBCONVERTER_DIR}/subconverter" ] || [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]; then
             installed=true
         fi
         
