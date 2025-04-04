@@ -141,17 +141,17 @@ show_docker_management_menu() {
         fi
         
         case $choice in
-            1) execute_module "container_deploy/docker_install.sh" ;;
+            1) execute_module "container_deploy/docker/docker_install.sh" ;;
             2) show_docker_status ;;
             3) show_docker_container_menu ;;
             4) show_docker_image_menu ;;
             5) show_docker_network_menu ;;
             6) show_docker_volume_menu ;;
             7) show_docker_prune_menu ;;
-            8) execute_module "container_deploy/docker_mirror.sh" ;;
-            9) edit_docker_config ;;
+            8) execute_module "container_deploy/docker/docker_mirror.sh" ;;
+            9) execute_module "container_deploy/docker/docker_edit_config.sh" ;;
             10) show_docker_ipv6_menu ;;
-            20) uninstall_docker ;;
+            20) execute_module "container_deploy/docker/docker_uninstall.sh" ;;
             0) return ;;
             *)
                 if [ "$USE_TEXT_MODE" = true ]; then
@@ -841,10 +841,10 @@ show_docker_ipv6_menu() {
         
         case $choice in
             1)
-                execute_module "container_deploy/docker_ipv6_enable.sh"
+                execute_module "container_deploy/docker/docker_ipv6_enable.sh"
                 ;;
             2)
-                execute_module "container_deploy/docker_ipv6_disable.sh"
+                execute_module "container_deploy/docker/docker_ipv6_disable.sh"
                 ;;
             3)
                 clear
@@ -1060,7 +1060,7 @@ show_ldnmp_environment_menu() {
         fi
         
         case $choice in
-            1) execute_module "container_deploy/ldnmp_install_environment.sh" ;;
+            1) execute_module "container_deploy/ldnmp_install.sh" ;;
             2) execute_module "container_deploy/ldnmp_config_management.sh" ;;
             3) show_ldnmp_status ;;
             4) execute_module "container_deploy/ldnmp_php_management.sh" ;;
