@@ -22,7 +22,11 @@ CURRENT_DIR="$(pwd)"
 # 订阅转换器菜单函数
 show_subscription_converter_menu() {
     # 执行订阅转换器脚本
-    execute_module "network_security/subscription_converter.sh"
+    # 使用source命令加载脚本，这样可以保留函数定义并执行主菜单
+    source "${MODULES_DIR}/network_security/subscription_converter.sh"
+    
+    # 调用其主菜单函数
+    show_subconverter_menu
 }
 
 # 显示网络安全菜单

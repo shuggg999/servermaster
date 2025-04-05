@@ -385,7 +385,11 @@ show_subconverter_menu() {
 }
 
 # 运行主函数
-show_subconverter_menu
+# 确保在脚本开始时调用主函数，但不在其他函数中调用main函数
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # 直接运行此脚本时
+    show_subconverter_menu
+fi
 
 # 安装Python Merger
 install_python_merger() {
@@ -490,211 +494,61 @@ EOF
     systemctl restart cron
 }
 
-# 添加订阅
-python_add_subscription() {
-    if [ "$USE_TEXT_MODE" = true ]; then
-        echo "添加订阅源"
-        echo "----------"
-        echo "请输入订阅名称 (如: vps1):"
-        read -p "名称: " name
-        echo "请输入订阅URL:"
-        read -p "URL: " url
-        
-        if [ -z "$name" ] || [ -z "$url" ]; then
-            echo "名称和URL不能为空!"
-            sleep 2
-            return
-        fi
-        
-        python3 "${SUBMERGER_INSTALL}" --add "$name" "$url"
-        echo "订阅已添加"
-        read -p "按Enter继续..." confirm
-    else
-        # 获取对话框尺寸
-        read dialog_height dialog_width <<< $(get_dialog_size)
-        
-        # 请求订阅名称
-        name=$(dialog --title "添加订阅" --inputbox "请输入订阅名称 (如: vps1):" 8 50 "" 2>&1 >/dev/tty)
-        
-        if [ $? -ne 0 ]; then
-            return
-        fi
-        
-        # 请求订阅URL
-        url=$(dialog --title "添加订阅" --inputbox "请输入订阅URL:" 8 60 "" 2>&1 >/dev/tty)
-        
-        if [ $? -ne 0 ]; then
-            return
-        fi
-        
-        if [ -z "$name" ] || [ -z "$url" ]; then
-            dialog --title "错误" --msgbox "名称和URL不能为空!" 6 40
-            return
-        fi
-        
-        result=$(python3 "${SUBMERGER_INSTALL}" --add "$name" "$url")
-        dialog --title "订阅添加" --msgbox "订阅已添加\n\n$result" 12 50
-    fi
-}
-
-# 删除订阅
-python_remove_subscription() {
-    # 获取当前订阅列表
-    local subs=$(python3 "${SUBMERGER_INSTALL}" --list)
-    
-    if [ "$USE_TEXT_MODE" = true ]; then
-        echo "当前订阅列表:"
-        echo "--------------"
-        echo "$subs"
-        echo ""
-        read -p "请输入要删除的订阅ID: " id
-        
-        if [ -z "$id" ]; then
-            echo "ID不能为空!"
-            sleep 2
-            return
-        fi
-        
-        python3 "${SUBMERGER_INSTALL}" --remove "$id"
-        echo "订阅已删除"
-        read -p "按Enter继续..." confirm
-    else
-        # 获取对话框尺寸
-        read dialog_height dialog_width <<< $(get_dialog_size)
-        
-        dialog --title "当前订阅列表" --msgbox "$subs" $dialog_height $dialog_width
-        
-        # 请求要删除的ID
-        id=$(dialog --title "删除订阅" --inputbox "请输入要删除的订阅ID:" 8 50 "" 2>&1 >/dev/tty)
-        
-        if [ $? -ne 0 ] || [ -z "$id" ]; then
-            return
-        fi
-        
-        result=$(python3 "${SUBMERGER_INSTALL}" --remove "$id")
-        dialog --title "订阅删除" --msgbox "订阅已删除\n\n$result" 10 50
-    fi
-}
-
-# 修改访问密码
-python_change_password() {
-    local current_password=$(cat "${SUBMERGER_ACCESS_TOKEN}")
-    
-    if [ "$USE_TEXT_MODE" = true ]; then
-        echo "修改访问密码"
-        echo "当前密码: ${current_password}"
-        echo "----------"
-        read -p "新密码: " new_password
-        
-        if [ -z "$new_password" ]; then
-            echo "密码不能为空!"
-            sleep 2
-            return
-        fi
-        
-        echo "$new_password" > "${SUBMERGER_ACCESS_TOKEN}"
-        echo "密码已更新"
-        sleep 2
-    else
-        # 获取对话框尺寸
-        read dialog_height dialog_width <<< $(get_dialog_size)
-        
-        new_password=$(dialog --title "修改密码" --inputbox "当前密码: ${current_password}\n\n请输入新的访问密码:" 10 50 "$current_password" 2>&1 >/dev/tty)
-        
-        if [ $? -ne 0 ]; then
-            return
-        fi
-        
-        if [ -z "$new_password" ]; then
-            dialog --title "错误" --msgbox "密码不能为空!" 6 40
-            return
-        fi
-        
-        echo "$new_password" > "${SUBMERGER_ACCESS_TOKEN}"
-        dialog --title "修改密码" --msgbox "密码已更新为: $new_password" 6 50
-    fi
-}
-
-# 修改服务端口
-python_change_port() {
-    local current_port=$(cat "${SUBMERGER_PORT_FILE}")
-    
-    if [ "$USE_TEXT_MODE" = true ]; then
-        echo "修改服务端口"
-        echo "当前端口: ${current_port}"
-        echo "----------"
-        read -p "新端口: " new_port
-        
-        if [ -z "$new_port" ]; then
-            echo "端口不能为空!"
-            sleep 2
-            return
-        fi
-        
-        # 检查端口是否为数字
-        if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
-            echo "端口必须是数字!"
-            sleep 2
-            return
-        fi
-        
-        echo "$new_port" > "${SUBMERGER_PORT_FILE}"
-        systemctl restart sub_merger
-        echo "端口已更新，服务已重启"
-        sleep 2
-    else
-        # 获取对话框尺寸
-        read dialog_height dialog_width <<< $(get_dialog_size)
-        
-        new_port=$(dialog --title "修改端口" --inputbox "当前端口: ${current_port}\n\n请输入新的服务端口:" 10 50 "$current_port" 2>&1 >/dev/tty)
-        
-        if [ $? -ne 0 ]; then
-            return
-        fi
-        
-        if [ -z "$new_port" ]; then
-            dialog --title "错误" --msgbox "端口不能为空!" 6 40
-            return
-        fi
-        
-        # 检查端口是否为数字
-        if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
-            dialog --title "错误" --msgbox "端口必须是数字!" 6 40
-            return
-        fi
-        
-        echo "$new_port" > "${SUBMERGER_PORT_FILE}"
-        systemctl restart sub_merger
-        
-        # 如果存在Nginx配置，也需要更新
-        if [ -f "/etc/nginx/conf.d/sub_merger.conf" ]; then
-            dialog --title "Nginx配置" --yesno "检测到Nginx配置，是否更新Nginx反向代理配置?" 7 50
-            if [ $? -eq 0 ]; then
-                fix_service_access
-            fi
-        fi
-        
-        dialog --title "修改端口" --msgbox "端口已更新为: $new_port\n服务已重启" 7 50
-    fi
-}
-
 # 查看订阅状态
 python_check_status() {
+    # 首先检查脚本是否存在
+    if [ ! -f "${SUBMERGER_INSTALL}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到Python脚本，请确保安装完成"
+            echo "路径: ${SUBMERGER_INSTALL}"
+            echo "尝试重新安装以解决此问题"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到Python脚本，请确保安装完成\n路径: ${SUBMERGER_INSTALL}\n\n尝试重新安装以解决此问题" 10 60
+        fi
+        return
+    fi
+
     # 获取服务状态
-    local service_status=$(systemctl is-active sub_merger)
-    local ip=$(get_external_ip)
-    local port=$(cat "${SUBMERGER_PORT_FILE}")
-    local token=$(cat "${SUBMERGER_ACCESS_TOKEN}")
+    local service_status=$(systemctl is-active sub_merger 2>/dev/null || echo "未知")
+    local ip=$(get_external_ip 2>/dev/null || echo "获取失败")
     
-    # 获取订阅列表
-    local subscription_list=$(python3 "${SUBMERGER_INSTALL}" --list)
+    # 安全地读取端口和令牌
+    local port=""
+    if [ -f "${SUBMERGER_PORT_FILE}" ]; then
+        port=$(cat "${SUBMERGER_PORT_FILE}" 2>/dev/null || echo "获取失败")
+    else
+        port="未配置 (默认: ${DEFAULT_MERGER_PORT})"
+    fi
     
-    # 生成访问链接
-    local access_links=$(python3 "${SUBMERGER_INSTALL}" --info)
+    local token=""
+    if [ -f "${SUBMERGER_ACCESS_TOKEN}" ]; then
+        token=$(cat "${SUBMERGER_ACCESS_TOKEN}" 2>/dev/null || echo "获取失败")
+    else
+        token="未配置 (默认: ${DEFAULT_PASSWORD})"
+    fi
+    
+    # 安全地获取订阅列表和访问链接
+    local subscription_list=""
+    local access_links=""
+    
+    if [ -x "${SUBMERGER_INSTALL}" ]; then
+        subscription_list=$(python3 "${SUBMERGER_INSTALL}" --list 2>&1 || echo "获取失败: $?")
+        access_links=$(python3 "${SUBMERGER_INSTALL}" --info 2>&1 || echo "获取失败: $?")
+    else
+        subscription_list="无法执行Python脚本 (权限不足)"
+        access_links="无法执行Python脚本 (权限不足)"
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: Python脚本权限不足"
+            echo "正在尝试修复权限..."
+            chmod +x "${SUBMERGER_INSTALL}" 2>/dev/null
+            echo "完成"
+        fi
+    fi
     
     # 检查是否有订阅源
     local has_subscriptions=true
-    if [ -z "$subscription_list" ] || [ "$subscription_list" = "没有配置订阅源" ]; then
+    if [ -z "$subscription_list" ] || [ "$subscription_list" = "没有配置订阅源" ] || [[ "$subscription_list" == *"获取失败"* ]]; then
         has_subscriptions=false
     fi
     
@@ -746,6 +600,349 @@ $subscription_list
                 check_service_access
             fi
         fi
+    fi
+}
+
+# 添加订阅
+python_add_subscription() {
+    # 首先检查脚本是否存在
+    if [ ! -f "${SUBMERGER_INSTALL}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到Python脚本，请确保安装完成"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到Python脚本，请确保安装完成" 6 40
+        fi
+        return
+    fi
+
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "添加订阅源"
+        echo "----------"
+        echo "请输入订阅名称 (如: vps1):"
+        read -p "名称: " name
+        echo "请输入订阅URL:"
+        read -p "URL: " url
+        
+        if [ -z "$name" ] || [ -z "$url" ]; then
+            echo "名称和URL不能为空!"
+            sleep 2
+            return
+        fi
+        
+        echo "正在添加订阅..."
+        result=$(python3 "${SUBMERGER_INSTALL}" --add "$name" "$url" 2>&1)
+        status=$?
+        if [ $status -ne 0 ]; then
+            echo "添加失败 (错误码: $status):"
+            echo "$result"
+        else
+            echo "订阅已添加"
+            echo "$result"
+        fi
+        read -p "按Enter继续..." confirm
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        # 请求订阅名称
+        name=$(dialog --title "添加订阅" --inputbox "请输入订阅名称 (如: vps1):" 8 50 "" 2>&1 >/dev/tty)
+        
+        if [ $? -ne 0 ]; then
+            return
+        fi
+        
+        # 请求订阅URL
+        url=$(dialog --title "添加订阅" --inputbox "请输入订阅URL:" 8 60 "" 2>&1 >/dev/tty)
+        
+        if [ $? -ne 0 ]; then
+            return
+        fi
+        
+        if [ -z "$name" ] || [ -z "$url" ]; then
+            dialog --title "错误" --msgbox "名称和URL不能为空!" 6 40
+            return
+        fi
+        
+        # 显示进度消息
+        dialog --title "添加订阅" --infobox "正在添加订阅，请稍候..." 5 40
+        
+        result=$(python3 "${SUBMERGER_INSTALL}" --add "$name" "$url" 2>&1)
+        status=$?
+        if [ $status -ne 0 ]; then
+            dialog --title "错误" --msgbox "添加失败 (错误码: $status):\n\n$result" 12 60
+        else
+            dialog --title "订阅添加" --msgbox "订阅已添加\n\n$result" 12 50
+        fi
+    fi
+}
+
+# 删除订阅
+python_remove_subscription() {
+    # 首先检查脚本是否存在
+    if [ ! -f "${SUBMERGER_INSTALL}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到Python脚本，请确保安装完成"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到Python脚本，请确保安装完成" 6 40
+        fi
+        return
+    fi
+
+    # 安全地获取当前订阅列表
+    local subs=$(python3 "${SUBMERGER_INSTALL}" --list 2>&1)
+    local status=$?
+    
+    if [ $status -ne 0 ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "获取订阅列表失败 (错误码: $status):"
+            echo "$subs"
+            read -p "按Enter继续..." confirm
+        else
+            dialog --title "错误" --msgbox "获取订阅列表失败 (错误码: $status):\n\n$subs" 12 60
+        fi
+        return
+    fi
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "当前订阅列表:"
+        echo "--------------"
+        echo "$subs"
+        echo ""
+        read -p "请输入要删除的订阅ID: " id
+        
+        if [ -z "$id" ]; then
+            echo "ID不能为空!"
+            sleep 2
+            return
+        fi
+        
+        echo "正在删除订阅..."
+        result=$(python3 "${SUBMERGER_INSTALL}" --remove "$id" 2>&1)
+        status=$?
+        if [ $status -ne 0 ]; then
+            echo "删除失败 (错误码: $status):"
+            echo "$result"
+        else
+            echo "订阅已删除"
+            echo "$result"
+        fi
+        read -p "按Enter继续..." confirm
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        dialog --title "当前订阅列表" --msgbox "$subs" $dialog_height $dialog_width
+        
+        # 请求要删除的ID
+        id=$(dialog --title "删除订阅" --inputbox "请输入要删除的订阅ID:" 8 50 "" 2>&1 >/dev/tty)
+        
+        if [ $? -ne 0 ] || [ -z "$id" ]; then
+            return
+        fi
+        
+        # 显示进度消息
+        dialog --title "删除订阅" --infobox "正在删除订阅，请稍候..." 5 40
+        
+        result=$(python3 "${SUBMERGER_INSTALL}" --remove "$id" 2>&1)
+        status=$?
+        if [ $status -ne 0 ]; then
+            dialog --title "错误" --msgbox "删除失败 (错误码: $status):\n\n$result" 12 60
+        else
+            dialog --title "订阅删除" --msgbox "订阅已删除\n\n$result" 10 50
+        fi
+    fi
+}
+
+# 修改访问密码
+python_change_password() {
+    # 首先检查目录是否存在
+    if [ ! -d "${SUBMERGER_DIR}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到配置目录，请确保安装完成"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到配置目录，请确保安装完成" 6 40
+        fi
+        return
+    fi
+
+    # 安全地读取当前密码
+    local current_password=""
+    if [ -f "${SUBMERGER_ACCESS_TOKEN}" ]; then
+        current_password=$(cat "${SUBMERGER_ACCESS_TOKEN}" 2>/dev/null || echo "读取失败")
+    else
+        # 创建密码文件
+        current_password="${DEFAULT_PASSWORD}"
+        echo "${DEFAULT_PASSWORD}" > "${SUBMERGER_ACCESS_TOKEN}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            if [ "$USE_TEXT_MODE" = true ]; then
+                echo "创建密码文件失败，请检查权限"
+                read -p "按Enter键继续..." confirm
+            else
+                dialog --title "错误" --msgbox "创建密码文件失败，请检查权限" 6 40
+            fi
+            return
+        fi
+    fi
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "修改访问密码"
+        echo "当前密码: ${current_password}"
+        echo "----------"
+        read -p "新密码: " new_password
+        
+        if [ -z "$new_password" ]; then
+            echo "密码不能为空!"
+            sleep 2
+            return
+        fi
+        
+        # 尝试写入新密码
+        echo "$new_password" > "${SUBMERGER_ACCESS_TOKEN}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "密码更新失败，请检查权限"
+            sleep 2
+            return
+        fi
+        
+        echo "密码已更新"
+        sleep 2
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        new_password=$(dialog --title "修改密码" --inputbox "当前密码: ${current_password}\n\n请输入新的访问密码:" 10 50 "$current_password" 2>&1 >/dev/tty)
+        
+        if [ $? -ne 0 ]; then
+            return
+        fi
+        
+        if [ -z "$new_password" ]; then
+            dialog --title "错误" --msgbox "密码不能为空!" 6 40
+            return
+        fi
+        
+        # 尝试写入新密码
+        echo "$new_password" > "${SUBMERGER_ACCESS_TOKEN}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            dialog --title "错误" --msgbox "密码更新失败，请检查权限" 6 40
+            return
+        fi
+        
+        dialog --title "修改密码" --msgbox "密码已更新为: $new_password" 6 50
+    fi
+    
+    # 重启服务以应用新密码
+    systemctl restart sub_merger 2>/dev/null
+}
+
+# 修改服务端口
+python_change_port() {
+    # 首先检查目录是否存在
+    if [ ! -d "${SUBMERGER_DIR}" ]; then
+        if [ "$USE_TEXT_MODE" = true ]; then
+            echo "错误: 未找到配置目录，请确保安装完成"
+            read -p "按Enter键继续..." confirm
+        else
+            dialog --title "错误" --msgbox "未找到配置目录，请确保安装完成" 6 40
+        fi
+        return
+    fi
+
+    # 安全地读取当前端口
+    local current_port=""
+    if [ -f "${SUBMERGER_PORT_FILE}" ]; then
+        current_port=$(cat "${SUBMERGER_PORT_FILE}" 2>/dev/null || echo "读取失败")
+    else
+        # 创建端口文件
+        current_port="${DEFAULT_MERGER_PORT}"
+        echo "${DEFAULT_MERGER_PORT}" > "${SUBMERGER_PORT_FILE}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            if [ "$USE_TEXT_MODE" = true ]; then
+                echo "创建端口文件失败，请检查权限"
+                read -p "按Enter键继续..." confirm
+            else
+                dialog --title "错误" --msgbox "创建端口文件失败，请检查权限" 6 40
+            fi
+            return
+        fi
+    fi
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "修改服务端口"
+        echo "当前端口: ${current_port}"
+        echo "----------"
+        read -p "新端口: " new_port
+        
+        if [ -z "$new_port" ]; then
+            echo "端口不能为空!"
+            sleep 2
+            return
+        fi
+        
+        # 检查端口是否为数字
+        if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
+            echo "端口必须是数字!"
+            sleep 2
+            return
+        fi
+        
+        # 尝试写入新端口
+        echo "$new_port" > "${SUBMERGER_PORT_FILE}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "端口更新失败，请检查权限"
+            sleep 2
+            return
+        fi
+        
+        # 重启服务
+        systemctl restart sub_merger 2>/dev/null
+        
+        echo "端口已更新，服务已重启"
+        sleep 2
+    else
+        # 获取对话框尺寸
+        read dialog_height dialog_width <<< $(get_dialog_size)
+        
+        new_port=$(dialog --title "修改端口" --inputbox "当前端口: ${current_port}\n\n请输入新的服务端口:" 10 50 "$current_port" 2>&1 >/dev/tty)
+        
+        if [ $? -ne 0 ]; then
+            return
+        fi
+        
+        if [ -z "$new_port" ]; then
+            dialog --title "错误" --msgbox "端口不能为空!" 6 40
+            return
+        fi
+        
+        # 检查端口是否为数字
+        if ! [[ "$new_port" =~ ^[0-9]+$ ]]; then
+            dialog --title "错误" --msgbox "端口必须是数字!" 6 40
+            return
+        fi
+        
+        # 尝试写入新端口
+        echo "$new_port" > "${SUBMERGER_PORT_FILE}" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            dialog --title "错误" --msgbox "端口更新失败，请检查权限" 6 40
+            return
+        fi
+        
+        # 重启服务
+        dialog --title "修改端口" --infobox "正在重启服务..." 5 30
+        systemctl restart sub_merger 2>/dev/null
+        
+        # 如果存在Nginx配置，也需要更新
+        if [ -f "/etc/nginx/conf.d/sub_merger.conf" ]; then
+            dialog --title "Nginx配置" --yesno "检测到Nginx配置，是否更新Nginx反向代理配置?" 7 50
+            if [ $? -eq 0 ]; then
+                fix_service_access
+            fi
+        fi
+        
+        dialog --title "修改端口" --msgbox "端口已更新为: $new_port\n服务已重启" 7 50
     fi
 }
 
