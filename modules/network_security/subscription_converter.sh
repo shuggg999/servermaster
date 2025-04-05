@@ -83,24 +83,10 @@ install_dependencies() {
     if [ -f /etc/debian_version ]; then
         # Debian/Ubuntu系统
         apt update -y
-        apt install -y curl wget tar unzip git nginx cron jq
-        
-        # 如果是Docker安装方式，安装Docker
-        if [ "$install_method" = "docker" ]; then
-            apt install -y docker.io docker-compose
-            systemctl enable docker
-            systemctl start docker
-        fi
+        apt install -y curl wget python3 python3-pip nginx cron
     elif [ -f /etc/redhat-release ]; then
         # CentOS/RHEL系统
-        yum install -y curl wget tar unzip git nginx cronie jq
-        
-        # 如果是Docker安装方式，安装Docker
-        if [ "$install_method" = "docker" ]; then
-            yum install -y docker-ce docker-compose-plugin
-            systemctl enable docker
-            systemctl start docker
-        fi
+        yum install -y curl wget python3 python3-pip nginx cronie
     else
         show_error_dialog "系统错误" "不支持的操作系统类型"
         exit 1
@@ -488,9 +474,7 @@ install_subconverter_wizard() {
     
     # 检查是否已安装
     local already_installed=false
-    if [ -d "${SUBCONVERTER_DIR}" ] && ([ -f "${SUBCONVERTER_DIR}/subconverter" ] || [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]); then
-        already_installed=true
-    elif [ -d "${SUBMERGER_DIR}" ] && [ -f "${SUBMERGER_INSTALL}" ]; then
+    if [ -d "${SUBMERGER_DIR}" ] && [ -f "${SUBMERGER_INSTALL}" ]; then
         already_installed=true
     fi
     
@@ -511,7 +495,7 @@ install_subconverter_wizard() {
         fi
     fi
     
-    # 选择安装方式
+    # 选择安装方式 - 直接使用Python方式
     select_installation_method
     
     # 获取配置参数
@@ -521,28 +505,9 @@ install_subconverter_wizard() {
     check_root
     install_dependencies
     
-    # 根据选择的安装方式执行不同的安装函数
-    if [ "$install_method" = "direct" ]; then
-        install_subconverter_direct
-        configure_subconverter "$port" "$password"
-    elif [ "$install_method" = "docker" ]; then
-        install_subconverter_docker
-        configure_subconverter "$port" "$password"
-    elif [ "$install_method" = "python" ]; then
-        install_python_merger
-        configure_python_merger "$port" "$password" "${subscriptions[@]}"
-    fi
-    
-    # 配置域名 (如果提供，且不是Python方式)
-    if [ -n "$domain" ] && [ "$install_method" != "python" ]; then
-        configure_nginx "$domain" "$port"
-    fi
-    
-    # 配置订阅刷新（仅SubConverter方式）
-    if [ "$install_method" != "python" ]; then
-        configure_refresh "$refresh_interval" "$formatted_subscriptions"
-        configure_subscription_proxy
-    fi
+    # 安装Python订阅合并器
+    install_python_merger
+    configure_python_merger "$port" "$password" "${subscriptions[@]}"
     
     # 显示安装信息
     show_installation_info
@@ -550,36 +515,14 @@ install_subconverter_wizard() {
 
 # 选择安装方式
 select_installation_method() {
-    local title="选择安装方式"
+    # 直接设置为Python方式
+    install_method="python"
     
     if [ "$USE_TEXT_MODE" = true ]; then
-        echo "请选择订阅管理工具的安装方式:"
-        echo "1) 直接安装 (传统方式)"
-        echo "2) Docker安装 (推荐，避免网络问题)"
-        echo "3) Python实现 (轻量级，更好支持Reality格式)"
-        read -p "请选择 [1-3]: " method_choice
-        
-        case $method_choice in
-            1) install_method="direct" ;;
-            2) install_method="docker" ;;
-            3) install_method="python" ;;
-            *) install_method="docker" ;; # 默认选择Docker
-        esac
+        echo "将使用Python轻量级实现安装订阅管理工具"
+        sleep 1
     else
-        # 获取对话框尺寸
-        read dialog_height dialog_width <<< $(get_dialog_size)
-        
-        # 显示选择对话框
-        method_options=(
-            "direct" "直接安装 (传统方式)"
-            "docker" "Docker安装 (推荐，避免网络问题)"
-            "python" "Python实现 (轻量级，更好支持Reality格式)"
-        )
-        
-        install_method=$(dialog --title "$title" --menu "请选择订阅管理工具的安装方式:" $dialog_height $dialog_width 3 "${method_options[@]}" 2>&1 >/dev/tty)
-        if [ -z "$install_method" ]; then
-            install_method="docker"  # 默认选择Docker
-        fi
+        dialog --title "安装方式" --msgbox "将使用Python轻量级实现安装订阅管理工具\n- 更好支持Reality格式\n- 轻量级实现\n- 简洁界面" 10 50
     fi
 }
 
@@ -1277,7 +1220,7 @@ $([ "$install_method" = "direct" ] && echo "  - 主配置: ${SUBCONVERTER_CONFIG
 # 卸载Sub-Converter
 uninstall_subconverter() {
     local title="卸载订阅管理工具"
-    local confirm_message="确定要卸载订阅管理工具吗？这将删除所有相关文件和配置。"
+    local confirm_message="确定要卸载Python订阅合并器吗？这将删除所有相关文件和配置。"
     local confirm
     
     if [ "$USE_TEXT_MODE" = true ]; then
@@ -1294,41 +1237,17 @@ uninstall_subconverter() {
         fi
     fi
     
-    # 检查安装方式
-    local is_docker=false
-    local is_python=false
-    
-    if [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]; then
-        is_docker=true
-    elif [ -f "${SUBMERGER_INSTALL}" ]; then
-        is_python=true
-    fi
-    
-    if [ "$is_docker" = true ]; then
-        # Docker方式卸载
-        docker-compose -f "${SUBCONVERTER_DOCKER_COMPOSE}" down
-    elif [ "$is_python" = true ]; then
-        # Python方式卸载
-        systemctl stop sub_merger
-        systemctl disable sub_merger
-    else
-        # 直接安装方式卸载
-        systemctl stop subconverter
-        systemctl disable subconverter
-    fi
+    # Python方式卸载
+    systemctl stop sub_merger
+    systemctl disable sub_merger
     
     # 删除文件
-    rm -rf "${SUBCONVERTER_DIR}"
     rm -rf "${SUBMERGER_DIR}"
-    rm -f "${SUBCONVERTER_SERVICE}"
     rm -f "${SUBMERGER_SERVICE}"
-    rm -f "${SUBCONVERTER_CRON}"
     rm -f "${SUBMERGER_CRON}"
-    rm -f "/etc/nginx/conf.d/subconverter.conf"
     
     # 重载服务
     systemctl daemon-reload
-    systemctl restart nginx
     
     if [ "$USE_TEXT_MODE" = true ]; then
         echo "订阅管理工具已成功卸载"
@@ -1771,49 +1690,22 @@ view_proxy_logs() {
 # 主菜单
 show_subconverter_menu() {
     local title="订阅管理与转换"
-    local menu_options=()
-    
-    # 检查是否为Python安装
-    local python_mode=false
-    if [ -f "${SUBMERGER_INSTALL}" ]; then
-        python_mode=true
-    fi
-    
-    if [ "$python_mode" = true ]; then
-        # Python模式菜单选项
-        menu_options=(
-            "1" "安装/配置 - 初始安装或重新配置"
-            "2" "添加订阅源 - 新增订阅源"
-            "3" "移除订阅源 - 删除已添加的订阅源"
-            "4" "修改访问密码 - 更改访问令牌"
-            "5" "修改服务端口 - 更改服务监听端口"
-            "6" "查看服务状态 - 检查运行情况和订阅列表"
-            "11" "卸载 - 删除所有组件"
-            "0" "返回上级菜单"
-        )
-    else
-        # 标准模式菜单选项
-        menu_options=(
-            "1" "安装/配置 - 初始安装或重新配置"
-            "2" "添加订阅 - 新增订阅"
-            "3" "移除订阅 - 删除订阅"
-            "4" "修改密码 - 更新访问密码"
-            "5" "刷新订阅 - 更新所有订阅"
-            "6" "生成合并订阅 - 创建聚合订阅"
-            "7" "服务状态 - 检查服务运行情况"
-            "8" "更新订阅代理 - 手动更新代理"
-            "9" "查看代理日志 - 检查代理运行状态"
-            "11" "卸载 - 删除所有组件"
-            "0" "返回上级菜单"
-        )
-    fi
+    local menu_options=(
+        "1" "安装/配置 - 初始安装或重新配置"
+        "2" "添加订阅源 - 新增订阅源"
+        "3" "移除订阅源 - 删除已添加的订阅源"
+        "4" "修改访问密码 - 更改访问令牌"
+        "5" "修改服务端口 - 更改服务监听端口"
+        "6" "查看服务状态 - 检查运行情况和订阅列表"
+        "7" "服务访问诊断 - 检查并修复访问问题"
+        "11" "卸载 - 删除所有组件"
+        "0" "返回上级菜单"
+    )
     
     while true; do
         # 检查服务状态
         local installed=false
-        if [ -d "${SUBCONVERTER_DIR}" ] && ([ -f "${SUBCONVERTER_DIR}/subconverter" ] || [ -f "${SUBCONVERTER_DOCKER_COMPOSE}" ]); then
-            installed=true
-        elif [ -d "${SUBMERGER_DIR}" ] && [ -f "${SUBMERGER_INSTALL}" ]; then
+        if [ -d "${SUBMERGER_DIR}" ] && [ -f "${SUBMERGER_INSTALL}" ]; then
             installed=true
         fi
         
@@ -1823,63 +1715,37 @@ show_subconverter_menu() {
             echo "===== $title ====="
             echo ""
             
-            if [ "$python_mode" = true ]; then
-                echo "  1) 安装/配置                 5) 修改服务端口"
-                echo "  2) 添加订阅源               6) 查看服务状态"
-                echo "  3) 移除订阅源               "
-                echo "  4) 修改访问密码             11) 卸载"
-                echo ""
-                echo "  0) 返回上级菜单"
-            else
-                echo "  1) 安装/配置                 7) 服务状态"
-                echo "  2) 添加订阅                 8) 更新订阅代理"
-                echo "  3) 移除订阅                 9) 查看代理日志"
-                echo "  4) 修改密码                 "
-                echo "  5) 刷新订阅                 11) 卸载"
-                echo "  6) 生成合并订阅             "
-                echo ""
-                echo "  0) 返回上级菜单"
-            fi
+            echo "  1) 安装/配置                 5) 修改服务端口"
+            echo "  2) 添加订阅源               6) 查看服务状态"
+            echo "  3) 移除订阅源               7) 服务访问诊断"
+            echo "  4) 修改访问密码             11) 卸载"
+            echo ""
+            echo "  0) 返回上级菜单"
             
             echo ""
             if [ "$installed" = true ]; then
-                if [ "$python_mode" = true ]; then
-                    echo "当前状态: 已安装 (Python订阅合并器)"
-                else
-                    echo "当前状态: 已安装 (Sub-Converter)"
-                fi
+                echo "当前状态: 已安装 (Python订阅合并器)"
             else
                 echo "当前状态: 未安装"
             fi
             echo ""
-            read -p "请选择操作 [0-$([ "$python_mode" = true ] && echo "6" || echo "11")]: " choice
+            read -p "请选择操作 [0-11]: " choice
         else
             # 获取对话框尺寸
             read dialog_height dialog_width <<< $(get_dialog_size)
             
             local status_text=""
             if [ "$installed" = true ]; then
-                if [ "$python_mode" = true ]; then
-                    status_text="当前状态: 已安装 (Python订阅合并器)"
-                else
-                    status_text="当前状态: 已安装 (Sub-Converter)"
-                fi
+                status_text="当前状态: 已安装 (Python订阅合并器)"
             else
                 status_text="当前状态: 未安装"
             fi
             
             # 使用Dialog显示菜单
-            if [ "$python_mode" = true ]; then
-                choice=$(dialog --clear --title "$title" \
-                    --extra-button --extra-label "刷新" \
-                    --menu "$status_text\n\n请选择一个选项: (★ 表示推荐选项)" $dialog_height $dialog_width 8 \
-                    "${menu_options[@]}" 2>&1 >/dev/tty)
-            else
-                choice=$(dialog --clear --title "$title" \
-                    --extra-button --extra-label "刷新" \
-                    --menu "$status_text\n\n请选择一个选项: (★ 表示推荐选项)" $dialog_height $dialog_width 12 \
-                    "${menu_options[@]}" 2>&1 >/dev/tty)
-            fi
+            choice=$(dialog --clear --title "$title" \
+                --extra-button --extra-label "刷新" \
+                --menu "$status_text\n\n请选择一个选项:" $dialog_height $dialog_width 8 \
+                "${menu_options[@]}" 2>&1 >/dev/tty)
             
             # 处理Dialog的返回值
             local dialog_ret=$?
@@ -1907,34 +1773,17 @@ show_subconverter_menu() {
         fi
         
         # 根据用户选择执行相应操作
-        if [ "$python_mode" = true ]; then
-            # Python模式下的菜单处理
-            case $choice in
-                1) install_subconverter_wizard ;;
-                2) python_add_subscription ;;
-                3) python_remove_subscription ;;
-                4) python_change_password ;;
-                5) python_change_port ;;
-                6) python_check_status ;;
-                11) uninstall_subconverter ;;
-                *) show_error_dialog "无效选择" "请输入有效的选项!" ;;
-            esac
-        else
-            # 标准模式下的菜单处理
-            case $choice in
-                1) install_subconverter_wizard ;;
-                2) add_subscription ;;
-                3) remove_subscription ;;
-                4) change_password ;;
-                5) refresh_subscriptions ;;
-                6) generate_merged_subscription ;;
-                7) check_status ;;
-                8) update_subscription_proxy ;;
-                9) view_proxy_logs ;;
-                11) uninstall_subconverter ;;
-                *) show_error_dialog "无效选择" "请输入有效的选项!" ;;
-            esac
-        fi
+        case $choice in
+            1) install_subconverter_wizard ;;
+            2) python_add_subscription ;;
+            3) python_remove_subscription ;;
+            4) python_change_password ;;
+            5) python_change_port ;;
+            6) python_check_status ;;
+            7) check_service_access ;;
+            11) uninstall_subconverter ;;
+            *) show_error_dialog "无效选择" "请输入有效的选项!" ;;
+        esac
     done
 }
 
@@ -1952,5 +1801,174 @@ show_error_dialog() {
         sleep 2
     else
         dialog --title "错误: $title" --msgbox "$message" 8 40
+    fi
+}
+
+# 检查端口和访问问题
+check_service_access() {
+    local title="检查服务访问问题"
+    local message="正在检查服务访问问题..."
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+    else
+        show_progress_dialog "$title" "$message"
+    fi
+    
+    # 读取当前端口
+    local port=""
+    if [ -f "${SUBMERGER_PORT_FILE}" ]; then
+        port=$(cat "${SUBMERGER_PORT_FILE}")
+    else
+        port="${DEFAULT_MERGER_PORT}"
+    fi
+    
+    # 检查端口是否被占用
+    local port_status=$(ss -tulpn | grep ":${port}" | wc -l)
+    
+    # 检查服务状态
+    local service_status=$(systemctl is-active sub_merger)
+    
+    # 检查Nginx配置
+    local nginx_status=$(systemctl is-active nginx)
+    local nginx_config_exists=false
+    
+    if [ -f "/etc/nginx/conf.d/sub_merger.conf" ]; then
+        nginx_config_exists=true
+    fi
+    
+    # 生成诊断报告
+    local report="服务访问诊断报告:\n\n"
+    report+="Python订阅合并器:\n"
+    report+="- 服务状态: ${service_status}\n"
+    report+="- 监听端口: ${port}\n"
+    report+="- 端口占用情况: $([ "$port_status" -eq 0 ] && echo "未占用（异常）" || echo "已占用（正常）")\n\n"
+    
+    report+="Nginx状态:\n"
+    report+="- 服务状态: ${nginx_status}\n"
+    report+="- 配置文件: $([ "$nginx_config_exists" = true ] && echo "存在" || echo "不存在")\n\n"
+    
+    local fix_message=""
+    local needs_fix=false
+    
+    # 分析问题并提供解决方案
+    if [ "$service_status" != "active" ]; then
+        fix_message+="服务未运行，需要启动服务\n"
+        needs_fix=true
+    fi
+    
+    if [ "$port_status" -eq 0 ]; then
+        fix_message+="端口未被监听，服务可能未正常启动\n"
+        needs_fix=true
+    fi
+    
+    if [ "$nginx_status" != "active" ]; then
+        fix_message+="Nginx未运行，需要启动Nginx\n"
+        needs_fix=true
+    fi
+    
+    if [ "$nginx_config_exists" = false ]; then
+        fix_message+="缺少Nginx配置，需要添加Nginx代理配置\n"
+        needs_fix=true
+    fi
+    
+    # 添加解决方案到报告
+    if [ "$needs_fix" = true ]; then
+        report+="发现问题:\n${fix_message}\n"
+        report+="是否自动修复这些问题?"
+    else
+        report+="未发现明显问题，服务应该可以正常访问。\n\n"
+        report+="如果仍然无法访问，请检查:\n"
+        report+="1. 防火墙是否允许这个端口\n"
+        report+="2. 服务器IP是否正确\n"
+        report+="3. 网络连接是否正常\n"
+        report+="4. 浏览器是否使用了代理\n\n"
+        report+="测试访问URL: http://localhost:${port}/sub?token=554365&target=v2ray"
+    fi
+    
+    # 显示报告
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo -e "$report"
+        if [ "$needs_fix" = true ]; then
+            read -p "是否自动修复? (y/n): " confirm
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                fix_service_access
+            fi
+        fi
+        read -p "按Enter键继续..." confirm
+    else
+        if [ "$needs_fix" = true ]; then
+            dialog --title "服务访问诊断" --yesno "$report" 20 70
+            local choice=$?
+            if [ $choice -eq 0 ]; then
+                fix_service_access
+            fi
+        else
+            dialog --title "服务访问诊断" --msgbox "$report" 20 70
+        fi
+    fi
+}
+
+# 修复服务访问问题
+fix_service_access() {
+    local title="修复服务访问问题"
+    local message="正在修复服务访问问题..."
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo "$message"
+    else
+        show_progress_dialog "$title" "$message"
+    fi
+    
+    # 读取当前端口
+    local port=""
+    if [ -f "${SUBMERGER_PORT_FILE}" ]; then
+        port=$(cat "${SUBMERGER_PORT_FILE}")
+    else
+        port="${DEFAULT_MERGER_PORT}"
+    fi
+    
+    # 创建Nginx配置
+    cat > "/etc/nginx/conf.d/sub_merger.conf" << EOF
+server {
+    listen 80;
+    
+    location /sub {
+        proxy_pass http://127.0.0.1:${port}/sub;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+}
+EOF
+    
+    # 重启服务
+    systemctl restart sub_merger
+    systemctl restart nginx
+    
+    # 确保服务自启动
+    systemctl enable sub_merger
+    systemctl enable nginx
+    
+    # 检查防火墙并开放端口
+    if command -v ufw > /dev/null; then
+        ufw allow 80/tcp
+        ufw allow ${port}/tcp
+    elif command -v firewall-cmd > /dev/null; then
+        firewall-cmd --permanent --add-port=80/tcp
+        firewall-cmd --permanent --add-port=${port}/tcp
+        firewall-cmd --reload
+    fi
+    
+    local success_message="修复完成，现在您应该可以通过以下链接访问服务了：\n\n"
+    success_message+="http://服务器IP/sub?token=554365&target=v2ray\n\n"
+    success_message+="也可以通过直接端口访问：\n"
+    success_message+="http://服务器IP:${port}/sub?token=554365&target=v2ray"
+    
+    if [ "$USE_TEXT_MODE" = true ]; then
+        echo -e "$success_message"
+        read -p "按Enter键继续..." confirm
+    else
+        dialog --title "修复完成" --msgbox "$success_message" 12 70
     fi
 }
