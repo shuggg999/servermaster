@@ -47,6 +47,11 @@ check_root() {
     fi
 }
 
+# 获取外部IP
+get_external_ip() {
+    curl -s https://api.ipify.org || curl -s https://ifconfig.me
+}
+
 # 安装依赖
 install_dependencies() {
     local title="安装依赖"
@@ -281,11 +286,11 @@ show_subconverter_menu() {
     local title="订阅管理与转换"
     local menu_options=(
         "1" "安装/配置 - 初始安装或重新配置"
-        "2" "添加订阅源 - 新增订阅源"
-        "3" "移除订阅源 - 删除已添加的订阅源"
-        "4" "修改访问密码 - 更改访问令牌"
-        "5" "修改服务端口 - 更改服务监听端口"
-        "6" "查看服务状态 - 检查运行情况和订阅列表"
+        "2" "查看服务状态 - 检查运行情况和订阅列表"
+        "3" "添加订阅源 - 新增订阅源"
+        "4" "移除订阅源 - 删除已添加的订阅源"
+        "5" "修改访问密码 - 更改访问令牌"
+        "6" "修改服务端口 - 更改服务监听端口"
         "7" "服务访问诊断 - 检查并修复访问问题"
         "11" "卸载 - 删除所有组件"
         "0" "返回上级菜单"
@@ -304,10 +309,10 @@ show_subconverter_menu() {
             echo "===== $title ====="
             echo ""
             
-            echo "  1) 安装/配置                 5) 修改服务端口"
-            echo "  2) 添加订阅源               6) 查看服务状态"
-            echo "  3) 移除订阅源               7) 服务访问诊断"
-            echo "  4) 修改访问密码             11) 卸载"
+            echo "  1) 安装/配置                 5) 修改访问密码"
+            echo "  2) 查看服务状态             6) 修改服务端口"
+            echo "  3) 添加订阅源               7) 服务访问诊断"
+            echo "  4) 移除订阅源               11) 卸载"
             echo ""
             echo "  0) 返回上级菜单"
             
@@ -364,14 +369,17 @@ show_subconverter_menu() {
         # 根据用户选择执行相应操作
         case $choice in
             1) install_subconverter_wizard ;;
-            2) python_add_subscription ;;
-            3) python_remove_subscription ;;
-            4) python_change_password ;;
-            5) python_change_port ;;
-            6) python_check_status ;;
+            2) python_check_status ;;
+            3) python_add_subscription ;;
+            4) python_remove_subscription ;;
+            5) python_change_password ;;
+            6) python_change_port ;;
             7) check_service_access ;;
             11) uninstall_subconverter ;;
-            *) show_error_dialog "无效选择" "请输入有效的选项!" ;;
+            *) 
+               echo "无效选择: $choice"
+               show_error_dialog "无效选择" "请输入有效的选项!" 
+               ;;
         esac
     done
 }
