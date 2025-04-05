@@ -114,7 +114,7 @@ show_vpn_proxy_menu() {
         "1" "Xray Reality VPN一键安装 - 自动配置订阅更新"
         "2" "Xray手动更新 - 更新现有Xray配置"
         "3" "其他代理工具 - 更多代理选项"
-        "4" "订阅转换管理 - 统一管理多VPS订阅"
+        "4" "订阅管理和转换 - 多协议订阅聚合与格式转换"
         "0" "返回上级菜单"
     )
     
@@ -128,7 +128,7 @@ show_vpn_proxy_menu() {
             echo "  1) Xray Reality VPN一键安装"
             echo "  2) Xray手动更新"
             echo "  3) 其他代理工具"
-            echo "  4) 订阅转换管理"
+            echo "  4) 订阅管理和转换"
             echo ""
             echo "  0) 返回上级菜单"
             echo ""
